@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ISL — Indian Sign Language Interpreter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet"/>
+
+  <style>
+
+    :root {
+      --bg:          #0a1b6e;
+      --surface:     #0e1018;
+      --card:        #080e31;
+      --border:      rgba(255,255,255,.07);
+      --accent:      #5b6ef5;
+      --accent2:     #8f57fb;
+      --accent3:     #3dd6c8;
+      --glow:        rgba(91,110,245,.35);
+      --glow2:       rgba(61,214,200,.25);
+      --text:        #e8eaf2;
+      --muted:       #b9bfd1;
+      --danger:      #f55b5b;
+      --success:     #3dca7f;
+      --radius:      16px;
+      --radius-lg:   24px;
+    }
+
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-size: 200px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      width: 900px; height: 600px;
+      background: radial-gradient(ellipse at 30% 40%, rgba(91,110,245,.12) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 60%, rgba(143,87,251,.08) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ──────────────────────────────────────────
+       LAYOUT WRAPPER
+    ────────────────────────────────────────── */
+    .page { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 0 20px 80px; }
+
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px 0 28px;
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .logo-group { display: flex; align-items: center; gap: 14px; }
+
+    .logo-icon {
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center;
+      font-size: 22px;
+      box-shadow: 0 0 28px var(--glow);
+    }
+
+    .brand {
+      display: flex; flex-direction: column;
+    }
+    .brand-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -.3px;
+      background: linear-gradient(90deg, #fff 20%, var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
+
+    .header-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 14px;
+      font-size: 12px; color: var(--muted);
+    }
+    .pulse-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .5; transform: scale(1.4); }
+    }
+
+
+    .hero {
+      text-align: center;
+      padding: 64px 0 48px;
+    }
+    .hero-eyebrow {
+      font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--accent3); margin-bottom: 18px;
+    }
+    .hero-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(32px, 5vw, 52px);
+      line-height: 1.1;
+      letter-spacing: -1px;
+      margin-bottom: 18px;
+    }
+    .hero-title span { color: var(--accent); }
+    .hero-desc { color: var(--muted); max-width: 520px; margin: 0 auto; font-size: 15px; }
+
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 40px;
+    }
+    @media (max-width: 680px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .25s, box-shadow .25s;
+    }
+    .card:hover { border-color: rgba(91,110,245,.3); box-shadow: 0 0 40px rgba(91,110,245,.08); }
+
+    .card-accent-bar {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      opacity: .7;
+    }
+    .card-accent-bar.teal { background: linear-gradient(90deg, var(--accent3), #5b6ef5); }
+
+    .card-icon {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      background: rgba(91,110,245,.12);
+      border: 1px solid rgba(91,110,245,.2);
+      display: grid; place-items: center;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    .card-icon.teal {
+      background: rgba(61,214,200,.1);
+      border-color: rgba(61,214,200,.2);
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .card-desc { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,.07);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .btn:hover::after { opacity: 1; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      box-shadow: 0 4px 20px var(--glow);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 28px var(--glow); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-teal {
+      background: linear-gradient(135deg, var(--accent3), #5b9cf5);
+      color: #07080d;
+      font-weight: 600;
+      box-shadow: 0 4px 20px var(--glow2);
+    }
+    .btn-teal:hover { transform: translateY(-1px); }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: rgba(91,110,245,.4); background: rgba(91,110,245,.06); }
+
+    .btn-sm { padding: 7px 14px; font-size: 12px; border-radius: 8px; }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .chip-blue { background: rgba(91,110,245,.12); color: #97a4ff; border: 1px solid rgba(91,110,245,.2); }
+    .chip-teal { background: rgba(61,214,200,.1);  color: var(--accent3); border: 1px solid rgba(61,214,200,.2); }
+    .chip-red  { background: rgba(245,91,91,.1);   color: #ff9090; border: 1px solid rgba(245,91,91,.2); }
+
+
+    .listening-wave {
+      display: none;
+      align-items: center;
+      gap: 3px;
+      height: 24px;
+    }
+    .listening-wave.active { display: flex; }
+    .listening-wave span {
+      display: block;
+      width: 3px; border-radius: 3px;
+      background: var(--accent);
+      animation: wave 1s ease-in-out infinite;
+    }
+    .listening-wave span:nth-child(1) { animation-delay: 0s; height: 8px; }
+    .listening-wave span:nth-child(2) { animation-delay: .1s; height: 16px; }
+    .listening-wave span:nth-child(3) { animation-delay: .2s; height: 22px; }
+    .listening-wave span:nth-child(4) { animation-delay: .3s; height: 14px; }
+    .listening-wave span:nth-child(5) { animation-delay: .4s; height: 8px; }
+    @keyframes wave {
+      0%,100% { transform: scaleY(1); }
+      50%      { transform: scaleY(.35); }
+    }
+
+
+    .transcript-box {
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 14px;
+      min-height: 48px;
+      color: var(--muted);
+      transition: border-color .3s;
+    }
+    .transcript-box.active { border-color: rgba(91,110,245,.4); color: var(--text); }
+
+
+    .result-panel {
+      margin-top: 32px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      display: none;
+      animation: slideUp .4s cubic-bezier(.2,.8,.4,1);
+    }
+    .result-panel.visible { display: block; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+      margin-bottom: 20px;
+    }
+    .result-label-en {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 28px;
+      background: linear-gradient(90deg, #fff, var(--accent3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .result-label-bn {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 16px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .confidence-bar-wrap {
+      margin-top: 16px;
+    }
+    .confidence-bar-label {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--muted); margin-bottom: 6px;
+    }
+    .confidence-bar-track {
+      height: 4px; border-radius: 4px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .confidence-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width .6s cubic-bezier(.2,.8,.4,1);
+    }
+
+
+    .video-wrap {
+      margin-top: 20px;
+      display: flex; flex-wrap: wrap; gap: 16px;
+    }
+    .video-wrap video {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      max-width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    }
+
+
+    .camera-preview-wrap {
+      position: relative;
+      margin-top: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      aspect-ratio: 4/3;
+      display: none;
+    }
+    .camera-preview-wrap.active { display: block; }
+
+    #cameraFeed {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .camera-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: flex-end;
+      padding: 16px;
+      background: linear-gradient(to top, rgba(7,8,13,.8) 0%, transparent 50%);
+    }
+
+    .camera-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent3), transparent);
+      box-shadow: 0 0 10px var(--accent3);
+      animation: scan 3s linear infinite;
+      display: none;
+    }
+    .scan-line.active { display: block; }
+    @keyframes scan {
+      from { top: 0; } to { top: 100%; }
+    }
+
+
+    .camera-preview-wrap::before,
+    .camera-preview-wrap::after {
+      content: '';
+      position: absolute;
+      width: 24px; height: 24px;
+      border-color: var(--accent3);
+      border-style: solid;
+      z-index: 2;
+    }
+    .camera-preview-wrap::before {
+      top: 12px; left: 12px;
+      border-width: 2px 0 0 2px;
+    }
+    .camera-preview-wrap::after {
+      bottom: 12px; right: 12px;
+      border-width: 0 2px 2px 0;
+    }
+
+
+    .progress-ring-wrap {
+      position: relative; display: none;
+      align-items: center; justify-content: center;
+      width: 56px; height: 56px; margin: 12px auto;
+    }
+    .progress-ring-wrap.active { display: flex; }
+    .progress-ring-svg { transform: rotate(-90deg); }
+    .progress-ring-circle {
+      fill: none;
+      stroke: var(--accent3);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 138;
+      stroke-dashoffset: 138;
+      transition: stroke-dashoffset .1s linear;
+    }
+    .progress-ring-text {
+      position: absolute;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 18px;
+      color: var(--accent3);
+    }
+
+    .speak-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(61,214,200,.3);
+      background: rgba(61,214,200,.08);
+      color: var(--accent3);
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .speak-btn:hover { background: rgba(61,214,200,.16); }
+    .speak-btn.speaking {
+      background: rgba(61,214,200,.2);
+      animation: glowPulse 1s ease-in-out infinite;
+    }
+    @keyframes glowPulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(61,214,200,.3); }
+      50%      { box-shadow: 0 0 0 8px rgba(61,214,200,0); }
+    }
+
+    .sign-result-full {
+      margin-top: 20px;
+      padding: 24px;
+      background: rgba(61,214,200,.05);
+      border: 1px solid rgba(61,214,200,.2);
+      border-radius: var(--radius);
+      display: none;
+      animation: slideUp .4s cubic-bezier(.2,.8,.4,1);
+    }
+    .sign-result-full.visible { display: block; }
+
+    .section-heading {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .section-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 48px 0;
+    }
+
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    footer span { color: var(--accent); }
+
+
+    .toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 13px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      opacity: 0; transform: translateY(12px);
+      transition: all .3s;
+      z-index: 999;
+      display: flex; align-items: center; gap: 10px;
+      max-width: 320px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+
+    .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.1);
+      border-top-color: var(--accent3);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    .spinner.active { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body>
+<div class="page">
+
+  
+  <header>
+
+  <section class="hero">
+    <a href="/logout" style="background:#f44336; color:white; padding:8px 12px; border-radius:4px;float:right;margin-right: 20px; text-decoration:none; font-weight:bold;">
+      Logout
+    </a>
+    <h1 class="hero-title">Real-time Sign Language Interpretation<br></h1>
+    <p class="hero-desc">HELLO, GOOD MORNING, GOOD AFTERNOON, GOOD EVENING, GOOD NIGHT, HOW ARE YOU, ALRIGHT, PLEASED, THANK YOU <p>
+  </section>
+
+  
+  <div class="grid-2">
+
+    
+    <div class="card">
+      <div class="card-accent-bar"></div>
+   
+      <h2 class="card-title">Voice Input</h2>
+      <p class="card-desc">Speak a greeting in English or Bengali. The model will recognise the intent and show the ISL animation.</p>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startRecognition('en')">
+          English
+        </button>
+        <button class="btn btn-outline" onclick="startRecognition('bn')">
+          Bengali
+        </button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:16px;min-height:28px;">
+        <div class="listening-wave" id="speechWave">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <span id="speechStatus" style="font-size:13px;color:var(--muted);"></span>
+      </div>
+
+      <div class="transcript-box" id="transcriptBox">Waiting for voice input…</div>
+    </div>
+
+    
+    <div class="card">
+      <div class="card-accent-bar teal"></div>
+      
+      <h2 class="card-title">Live Gesture Input</h2>
+      <p class="card-desc">Show your sign gesture on camera for 5 seconds. The model will classify it in real-time.</p>
+
+      <div class="btn-row">
+        <button class="btn btn-teal" id="captureBtn" onclick="startCapture()">
+          Start Capture
+        </button>
+        <div class="spinner" id="captureSpinner"></div>
+      </div>
+
+      
+      <div class="progress-ring-wrap" id="progressRing">
+        <svg class="progress-ring-svg" width="56" height="56" viewBox="0 0 56 56">
+          <circle cx="28" cy="28" r="22" stroke="rgba(255,255,255,.05)" fill="none" stroke-width="3"/>
+          <circle class="progress-ring-circle" id="ringCircle" cx="28" cy="28" r="22"/>
+        </svg>
+        <span class="progress-ring-text" id="ringText">5</span>
+      </div>
+
+      <div class="camera-preview-wrap" id="cameraWrap">
+        <video id="cameraFeed" autoplay muted playsinline></video>
+        <div class="scan-line" id="scanLine"></div>
+        <div class="camera-overlay">
+          <div class="camera-status">
+            <div class="pulse-dot"></div>
+            <span id="cameraStatusText" style="font-size:12px;color:var(--muted);">Live</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+ 
+  <div class="result-panel" id="speechResult">
+    <div class="card-accent-bar"></div>
+    <div class="result-header">
+      <div>
+        <div class="result-label-en" id="speechLabelEn">—</div>
+        <div class="result-label-bn" id="speechLabelBn"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span class="chip chip-blue" id="speechChip">Intent</span>
+        <button class="speak-btn" id="speechSpeakBtn" onclick="speakResult('speech')">
+          Speak
+        </button>
+      </div>
+    </div>
+    <div class="confidence-bar-wrap">
+      <div class="confidence-bar-label">
+        <span>Confidence</span>
+        <span id="speechConfVal">—</span>
+      </div>
+      <div class="confidence-bar-track">
+        <div class="confidence-bar-fill" id="speechConfBar" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="video-wrap" id="speechVideos"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  
+  <section>
+    <h2 class="section-heading">Gesture Prediction</h2>
+    <p class="section-sub">Output from the real-time sign recognition model</p>
+
+    <div class="sign-result-full" id="signResult">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div>
+          <div class="result-label-en" id="signLabelEn">—</div>
+          <div class="result-label-bn" id="signLabelBn"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span class="chip chip-teal" id="signChip">Sign</span>
+          <button class="speak-btn" id="signSpeakBtn" onclick="speakResult('sign')">
+            Speak
+          </button>
+        </div>
+      </div>
+
+      <div class="confidence-bar-wrap" style="margin-top:16px;">
+        <div class="confidence-bar-label">
+          <span>Model Confidence</span>
+          <span id="signConfVal">—</span>
+        </div>
+        <div class="confidence-bar-track">
+          <div class="confidence-bar-fill" id="signConfBar" style="width:0%;background:linear-gradient(90deg,var(--accent3),#5b9cf5)"></div>
+        </div>
+      </div>
+
+      <div class="video-wrap" id="signVideos"></div>
+    </div>
+  </section>
+
+  
+  <footer>
+    <p>Built with <span>CNN + BiLSTM</span> · mBERT · Flask · Web Speech API</p>
+    <p style="margin-top:6px;">ISL Interpreter — Sign Language Recognition System</p>
+  </footer>
+
+
+
+<div class="toast" id="toast">
+  <span id="toastIcon"></span>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+
+let toastTimer;
+function showToast(msg, icon='ℹ️') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent  = msg;
+  document.getElementById('toastIcon').textContent = icon;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+
+let ttsData = {};   // stores {en, bn} per result source
+
+function speakResult(source) {
+  const d = ttsData[source];
+  if (!d) return;
+
+  const btn = document.getElementById(source + 'SpeakBtn');
+
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(d.en);
+  utter.lang  = 'en-US';
+  utter.rate  = 0.9;
+  utter.pitch = 1;
+
+  btn.classList.add('speaking');
+  utter.onend  = () => btn.classList.remove('speaking');
+  utter.onerror= () => btn.classList.remove('speaking');
+
+  window.speechSynthesis.speak(utter);
+}
+
+function autoSpeak(label, source) {
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(label.replace(/_/g,' '));
+  utter.lang  = 'en-US';
+  utter.rate  = 0.85;
+  window.speechSynthesis.speak(utter);
+}
+
+
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer;
+
+function startRecognition(lang) {
+  if (!SpeechRec) { showToast('Speech recognition not supported in this browser.', ''); return; }
+
+  if (recognizer) { try { recognizer.stop(); } catch(_){} }
+
+  recognizer = new SpeechRec();
+  recognizer.lang            = lang === 'bn' ? 'bn-BD' : 'en-US';
+  recognizer.continuous      = false;
+  recognizer.interimResults  = false;
+
+  const wave   = document.getElementById('speechWave');
+  const status = document.getElementById('speechStatus');
+  const box    = document.getElementById('transcriptBox');
+
+  wave.classList.add('active');
+  status.textContent = 'Listening…';
+  box.textContent    = 'Listening…';
+  box.classList.add('active');
+
+  recognizer.start();
+
+  recognizer.onresult = function(e) {
+    const transcript = e.results[0][0].transcript.trim();
+    box.textContent  = '"' + transcript + '"';
+    status.textContent = 'Processing…';
+    wave.classList.remove('active');
+    processSpeech(transcript, lang);
+  };
+
+  recognizer.onerror = function(e) {
+    wave.classList.remove('active');
+    status.textContent = '';
+    box.textContent = 'Error: ' + e.error + '. Please try again.';
+    box.classList.remove('active');
+    showToast('Recognition error: ' + e.error, '');
+  };
+
+  recognizer.onend = function() {
+    wave.classList.remove('active');
+  };
+}
+
+function processSpeech(text, lang) {
+  fetch('/process_speech', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ text, lang })
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('speechStatus').textContent = '';
+    if (data.error) { showToast(data.error, ''); return; }
+
+    // Fill result panel
+    const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
+    document.getElementById('speechLabelEn').textContent = enLabel;
+    document.getElementById('speechLabelBn').textContent = data.bengali || '';
+    document.getElementById('speechChip').textContent   = data.predicted_label;
+
+    const conf = Math.round((data.confidence || 0) * 100);
+    document.getElementById('speechConfVal').textContent = conf + '%';
+    document.getElementById('speechConfBar').style.width = conf + '%';
+
+    ttsData['speech'] = { en: enLabel, bn: data.bengali || '' };
+
+    // Videos
+    const vWrap = document.getElementById('speechVideos');
+    vWrap.innerHTML = '';
+    (data.videos || []).forEach(src => {
+      const v = document.createElement('video');
+      v.controls = true; v.autoplay = true;
+      v.style.maxWidth = '320px';
+      const s = document.createElement('source');
+      s.src = src; s.type = 'video/mp4';
+      v.appendChild(s);
+      vWrap.appendChild(v);
+
+      let plays = 0;
+      v.addEventListener('ended', () => {
+        plays++;
+        if (plays < 2) { v.currentTime = 0; v.play(); }
+        else v.remove();
+      });
+    });
+
+    document.getElementById('speechResult').classList.add('visible');
+    autoSpeak(enLabel, 'speech');
+    showToast('Intent detected: ' + enLabel, '');
+  })
+  .catch(err => {
+    showToast('Server error. Check Flask is running.', '');
+    console.error(err);
+  });
+}
+
+let mediaStream = null;
+const CAPTURE_DURATION_MS = 5000;
+const FRAME_INTERVAL_MS   = 150;   
+
+function setCaptureBtnState(running) {
+  const btn = document.getElementById('captureBtn');
+  const sp  = document.getElementById('captureSpinner');
+  btn.disabled = running;
+  btn.textContent = running ? 'Capturing…' : 'Start Capture';
+  sp.classList.toggle('active', running);
+}
+
+
+async function startCapture() {
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('Camera not supported or blocked. Use a modern browser with HTTPS.', '');
+    return;  // stop the function
+  }
+  setCaptureBtnState(true);
+  const ringWrap = document.getElementById('progressRing');
+  const ringCircle = document.getElementById('ringCircle');
+  const ringText   = document.getElementById('ringText');
+  const cameraWrap = document.getElementById('cameraWrap');
+  const scanLine   = document.getElementById('scanLine');
+  const cameraStatusText = document.getElementById('cameraStatusText');
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    const feed = document.getElementById('cameraFeed');
+    feed.srcObject = mediaStream;
+    cameraWrap.classList.add('active');
+    await new Promise(r => setTimeout(r, 600));  // camera warm-up
+
+    scanLine.classList.add('active');
+    ringWrap.classList.add('active');
+    cameraStatusText.textContent = 'Capturing…';
+    showToast('Recording gesture for 5 seconds…', '');
+
+    const frames = [];
+    const canvas = document.createElement('canvas');
+    canvas.width  = feed.videoWidth  || 320;
+    canvas.height = feed.videoHeight || 240;
+    const ctx = canvas.getContext('2d');
+
+    const startTime = Date.now();
+    const circumference = 138; // 2π×22
+
+    while (Date.now() - startTime < CAPTURE_DURATION_MS) {
+      ctx.drawImage(feed, 0, 0, canvas.width, canvas.height);
+      frames.push(canvas.toDataURL('image/jpeg', 0.7));
+
+      const elapsed = Date.now() - startTime;
+      const pct     = elapsed / CAPTURE_DURATION_MS;
+      ringCircle.style.strokeDashoffset = circumference * (1 - pct);
+      ringText.textContent = Math.ceil((CAPTURE_DURATION_MS - elapsed) / 1000);
+
+      await new Promise(r => setTimeout(r, FRAME_INTERVAL_MS));
+    }
+
+    // clean UI
+    ringCircle.style.strokeDashoffset = 0;
+    ringText.textContent = '✓';
+    cameraStatusText.textContent = 'Predicting…';
+    showToast('Sending frames to model…', '');
+
+    // call backend
+    const res  = await fetch('/predict_sign', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ frames })
+    });
+    const data = await res.json();
+
+    if (data.error) { showToast(data.error, ''); return; }
+
+    const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
+    document.getElementById('signLabelEn').textContent = enLabel;
+    document.getElementById('signLabelBn').textContent = data.bengali || '';
+    document.getElementById('signChip').textContent    = data.predicted_label;
+
+    const conf = Math.round((data.confidence || 0) * 100);
+    document.getElementById('signConfVal').textContent = conf + '%';
+    document.getElementById('signConfBar').style.width = conf + '%';
+
+    ttsData['sign'] = { en: enLabel, bn: data.bengali || '' };
+
+    const vWrap = document.getElementById('signVideos');
+    vWrap.innerHTML = '';
+    (data.videos || []).forEach(src => {
+      const v = document.createElement('video');
+      v.controls = true; v.autoplay = true;
+      v.style.maxWidth = '320px';
+      const s = document.createElement('source');
+      s.src = src; s.type = 'video/mp4';
+      v.appendChild(s);
+      vWrap.appendChild(v);
+      let plays = 0;
+      v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
+    });
+
+    document.getElementById('signResult').classList.add('visible');
+    autoSpeak(enLabel, 'sign');
+    showToast('Sign recognised: ' + enLabel, '');
+
+  } catch (err) {
+    showToast('Camera error: ' + err.message, '');
+    console.error(err);
+  } finally {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+    document.getElementById('cameraWrap').classList.remove('active');
+    document.getElementById('scanLine').classList.remove('active');
+    document.getElementById('progressRing').classList.remove('active');
+    setCaptureBtnState(false);
+  }
+}
+</script>
+</body>
+</html>

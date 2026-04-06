@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+   
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #2196f3, #6dd5ed);
+    }
+
+ 
+    .login-box {
+      background: white;
+      padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+      width: 350px;
+      text-align: center;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .login-box:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.25);
+    }
+
+
+    .login-box h2 {
+      margin-bottom: 24px;
+      font-size: 28px;
+      color: #333;
+      letter-spacing: 1px;
+    }
+
+  
+input[type="text"], input[type="password"] {
+  width: calc(100% - 20px);  /* reduce width to add margin on right */
+  padding: 12px 14px;
+  margin: 12px 10px 12px 0;  /* top, right, bottom, left */
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+    input[type="text"]:focus, input[type="password"]:focus {
+      outline: none;
+      border-color: #2196f3;
+      box-shadow: 0 0 8px rgba(33,150,243,0.3);
+    }
+
+   
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 16px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    button:hover {
+      background: #1976d2;
+      transform: scale(1.02);
+    }
+
+
+    .error {
+      color: #f44336;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+  
+    ::placeholder {
+      color: #aaa;
+      font-style: italic;
+    }
+
+
+    .login-box {
+      animation: fadeIn 0.8s ease;
+    }
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>Login</h2>
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="POST">
+      <input type="text" name="username" placeholder="Username" required>
+      <input type="password" name="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</body>
+</html>

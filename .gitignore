@@ -1,0 +1,10 @@
+final_model/
+model/
+__pycache__/
+*.pyc
+venv/
+.env
+*.keras
+*.h5
+*.pt
+*.pth

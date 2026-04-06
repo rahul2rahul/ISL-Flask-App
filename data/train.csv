@@ -1,0 +1,215 @@
+text,label
+hello,HELLO
+hi,HELLO
+hey,HELLO
+hello there,HELLO
+hi there,HELLO
+hey there,HELLO
+greetings,HELLO
+welcome,HELLO
+good to see you,HELLO
+nice to see you,HELLO
+hello friend,HELLO
+hello everyone,HELLO
+hello sir,HELLO
+hello madam,HELLO
+hello buddy,HELLO
+hey buddy,HELLO
+pleased to meet you,HELLO
+hello again,HELLO
+hi everyone,HELLO
+warm greetings,HELLO
+hallo,HELLO
+hey friend,HELLO
+hi buddy,HELLO
+hello dear,HELLO
+hello my friend,HELLO
+হ্যালো,HELLO
+হাই,HELLO
+হ্যালো বন্ধু,HELLO
+হ্যালো সবাই,HELLO
+আপনাকে স্বাগতম,HELLO
+শুভেচ্ছা,HELLO
+হ্যালো আপনাকে,HELLO
+হ্যালো স্যার,HELLO
+হ্যালো ম্যাডাম,HELLO
+আপনাকে দেখে ভালো লাগছে,HELLO
+হ্যালো আবার,HELLO
+স্বাগতম বন্ধু,HELLO
+শুভেচ্ছা রইল,HELLO
+হ্যালো প্রিয়,HELLO
+হ্যালো প্রিয় বন্ধু,HELLO
+good morning,GOOD_MORNING
+very good morning,GOOD_MORNING
+morning,GOOD_MORNING
+wish you a good morning,GOOD_MORNING
+have a great morning,GOOD_MORNING
+pleasant morning,GOOD_MORNING
+beautiful morning,GOOD_MORNING
+good morning friend,GOOD_MORNING
+good morning everyone,GOOD_MORNING
+fresh morning,GOOD_MORNING
+early morning,GOOD_MORNING
+lovely morning,GOOD_MORNING
+sunny morning,GOOD_MORNING
+happy morning,GOOD_MORNING
+warm morning wishes,GOOD_MORNING
+morning greetings,GOOD_MORNING
+start your day well,GOOD_MORNING
+enjoy your morning,GOOD_MORNING
+morning to you,GOOD_MORNING
+nice morning,GOOD_MORNING
+শুভ সকাল,GOOD_MORNING
+আপনাকে শুভ সকাল,GOOD_MORNING
+সুপ্রভাত,GOOD_MORNING
+শুভ প্রভাত,GOOD_MORNING
+সকালের শুভেচ্ছা,GOOD_MORNING
+আজ সকাল ভালো হোক,GOOD_MORNING
+ভালো সকাল,GOOD_MORNING
+সুন্দর সকাল,GOOD_MORNING
+শুভ সকাল বন্ধু,GOOD_MORNING
+সকালের শুভ কামনা,GOOD_MORNING
+ভোরের শুভেচ্ছা,GOOD_MORNING
+শুভ সকাল স্যার,GOOD_MORNING
+শুভ সকাল ম্যাডাম,GOOD_MORNING
+আনন্দময় সকাল,GOOD_MORNING
+good afternoon,GOOD_AFTERNOON
+pleasant afternoon,GOOD_AFTERNOON
+have a nice afternoon,GOOD_AFTERNOON
+afternoon greetings,GOOD_AFTERNOON
+warm afternoon wishes,GOOD_AFTERNOON
+good afternoon everyone,GOOD_AFTERNOON
+good afternoon friend,GOOD_AFTERNOON
+enjoy your afternoon,GOOD_AFTERNOON
+hope your afternoon is good,GOOD_AFTERNOON
+nice afternoon,GOOD_AFTERNOON
+শুভ অপরাহ্ন,GOOD_AFTERNOON
+আপনাকে শুভ অপরাহ্ন,GOOD_AFTERNOON
+দুপুরের শুভেচ্ছা,GOOD_AFTERNOON
+শুভ দুপুর,GOOD_AFTERNOON
+আজ দুপুর ভালো হোক,GOOD_AFTERNOON
+দুপুরের শুভ কামনা,GOOD_AFTERNOON
+ভালো অপরাহ্ন,GOOD_AFTERNOON
+সুন্দর অপরাহ্ন,GOOD_AFTERNOON
+দুপুরের শুভ বার্তা,GOOD_AFTERNOON
+আনন্দময় অপরাহ্ন,GOOD_AFTERNOON
+good evening,GOOD_EVENING
+pleasant evening,GOOD_EVENING
+have a nice evening,GOOD_EVENING
+evening greetings,GOOD_EVENING
+beautiful evening,GOOD_EVENING
+warm evening wishes,GOOD_EVENING
+good evening everyone,GOOD_EVENING
+good evening friend,GOOD_EVENING
+enjoy your evening,GOOD_EVENING
+hope your evening is good,GOOD_EVENING
+শুভ সন্ধ্যা,GOOD_EVENING
+আপনাকে শুভ সন্ধ্যা,GOOD_EVENING
+সন্ধ্যার শুভেচ্ছা,GOOD_EVENING
+শুভ সন্ধ্যা বন্ধু,GOOD_EVENING
+শুভ সন্ধ্যা সবাই,GOOD_EVENING
+সুন্দর সন্ধ্যা,GOOD_EVENING
+ভালো সন্ধ্যা,GOOD_EVENING
+সন্ধ্যার শুভ কামনা,GOOD_EVENING
+সন্ধ্যার শুভ বার্তা,GOOD_EVENING
+আনন্দময় সন্ধ্যা,GOOD_EVENING
+good night,GOOD_NIGHT
+sleep well,GOOD_NIGHT
+sweet dreams,GOOD_NIGHT
+have a good night,GOOD_NIGHT
+rest well,GOOD_NIGHT
+peaceful night,GOOD_NIGHT
+good night everyone,GOOD_NIGHT
+good night friend,GOOD_NIGHT
+pleasant night,GOOD_NIGHT
+calm night,GOOD_NIGHT
+শুভ রাত্রি,GOOD_NIGHT
+শুভ রাত্রি আপনাকে,GOOD_NIGHT
+রাত্রির শুভেচ্ছা,GOOD_NIGHT
+ভালো ঘুম হোক,GOOD_NIGHT
+মিষ্টি স্বপ্ন,GOOD_NIGHT
+শুভ রাত্রি বন্ধু,GOOD_NIGHT
+শুভ রাত্রি সবাই,GOOD_NIGHT
+রাতটা ভালো কাটুক,GOOD_NIGHT
+রাত্রির শুভ কামনা,GOOD_NIGHT
+শান্তিময় রাত্রি,GOOD_NIGHT
+how are you,HOW_ARE_YOU
+how are you doing,HOW_ARE_YOU
+how are things,HOW_ARE_YOU
+how is everything,HOW_ARE_YOU
+how have you been,HOW_ARE_YOU
+are you doing well,HOW_ARE_YOU
+hope you are fine,HOW_ARE_YOU
+how do you feel,HOW_ARE_YOU
+how is it going,HOW_ARE_YOU
+how are you today,HOW_ARE_YOU
+কেমন আছেন,HOW_ARE_YOU
+আপনি কেমন আছেন,HOW_ARE_YOU
+সব ঠিক আছে তো,HOW_ARE_YOU
+কেমন চলছে,HOW_ARE_YOU
+আজ কেমন আছেন,HOW_ARE_YOU
+আপনি ভালো তো,HOW_ARE_YOU
+সব কেমন চলছে,HOW_ARE_YOU
+আপনার কেমন লাগছে,HOW_ARE_YOU
+আশা করি ভালো আছেন,HOW_ARE_YOU
+সব ঠিকঠাক তো,HOW_ARE_YOU
+alright,ALRIGHT
+i am alright,ALRIGHT
+i am fine,ALRIGHT
+doing fine,ALRIGHT
+i am okay,ALRIGHT
+everything is fine,ALRIGHT
+all good,ALRIGHT
+doing well,ALRIGHT
+i am good,ALRIGHT
+feeling okay,ALRIGHT
+ভালো আছি,ALRIGHT
+আমি ভালো আছি,ALRIGHT
+সব ঠিক আছে,ALRIGHT
+সব ভালো,ALRIGHT
+আমি ঠিক আছি,ALRIGHT
+ভালই আছি,ALRIGHT
+কিছু সমস্যা নেই,ALRIGHT
+সব ঠিকঠাক,ALRIGHT
+ভালোই চলছে,ALRIGHT
+আমি সুস্থ,ALRIGHT
+pleased,PLEASED
+nice to meet you,PLEASED
+glad to meet you,PLEASED
+happy to meet you,PLEASED
+pleased to meet you,PLEASED
+nice meeting you,PLEASED
+great to meet you,PLEASED
+delighted to meet you,PLEASED
+pleasure to meet you,PLEASED
+very pleased,PLEASED
+খুব আনন্দিত,PLEASED
+দেখে আনন্দিত,PLEASED
+আপনাকে পেয়ে আনন্দিত,PLEASED
+খুশি হলাম,PLEASED
+খুব ভালো লাগছে,PLEASED
+আপনাকে দেখে ভালো লাগলো,PLEASED
+আনন্দ পেলাম,PLEASED
+আপনার সাথে দেখা করে ভালো লাগলো,PLEASED
+খুশি হয়েছি,PLEASED
+খুবই আনন্দিত,PLEASED
+thank you,THANK_YOU
+thanks,THANK_YOU
+many thanks,THANK_YOU
+thank you very much,THANK_YOU
+thanks a lot,THANK_YOU
+thank you so much,THANK_YOU
+much appreciated,THANK_YOU
+thanks for your help,THANK_YOU
+thank you kindly,THANK_YOU
+thank you friend,THANK_YOU
+ধন্যবাদ,THANK_YOU
+অনেক ধন্যবাদ,THANK_YOU
+আপনাকে ধন্যবাদ,THANK_YOU
+ধন্যবাদ আপনাকে,THANK_YOU
+খুব ধন্যবাদ,THANK_YOU
+অসংখ্য ধন্যবাদ,THANK_YOU
+ধন্যবাদ বন্ধু,THANK_YOU
+ধন্যবাদ সবাইকে,THANK_YOU
+আপনাদের ধন্যবাদ,THANK_YOU
+আন্তরিক ধন্যবাদ,THANK_YOU
