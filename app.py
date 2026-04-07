@@ -13,7 +13,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USERNAME = "admin"
 PASSWORD = "1234"
 
-MODEL_PATH = "./final_model"
+MODEL_PATH = "rahul2025/islmodel"
 tokenizer     = AutoTokenizer.from_pretrained(MODEL_PATH)
 intent_model  = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
 intent_model.to(DEVICE)
