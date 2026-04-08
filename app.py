@@ -6,6 +6,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.models import load_model
 
+#creating server
 app = Flask(__name__)
 app.secret_key = 'supersecretkey' 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
