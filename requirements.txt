@@ -3,5 +3,6 @@ gunicorn
 numpy
 opencv-python-headless
 torch
-transformers
-tensorflow
+transformers==4.33.2
+tensorflow==2.13.1
+h5py
