@@ -1,2 +1,7 @@
 flask
 gunicorn
+numpy
+opencv-python-headless
+torch
+transformers
+tensorflow
