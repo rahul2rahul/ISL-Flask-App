@@ -4,4 +4,8 @@ numpy==1.24.4
 opencv-python-headless==4.8.1.78
 tensorflow==2.13.1
 transformers==4.33.2
+<<<<<<< HEAD
 h5py==3.9.0
+=======
+h5py==3.9.0
+>>>>>>> ab68b8e (removed unused files)
