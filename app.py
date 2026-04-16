@@ -81,6 +81,7 @@ intent_model = TFBertForSequenceClassification.from_pretrained(
 # ═══════════════════════════════════════════════════════════════════
 from huggingface_hub import hf_hub_download
 
+
 model_path = hf_hub_download(
     repo_id="rahul2025/isl-sign",
     filename="model_cnn_bilstm.keras"
@@ -90,12 +91,14 @@ sign_model = load_model(model_path)
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 
-with open(LABEL_MAP_PATH, encoding="utf-8") as f:
-    label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
+label_map_path = hf_hub_download(
+    repo_id="rahul2025/isl-sign",
+    filename="label_map.json"
+)
 
-# ═══════════════════════════════════════════════════════════════════
-# 4.  INTENT PREDICTION  — mBERT, pure TF, zero torch
-# ═══════════════════════════════════════════════════════════════════
+with open(label_map_path, encoding="utf-8") as f:
+    label_map = json.load(f)
+
 def predict_intent(text: str):
     encoded = tokenizer(
         text,
