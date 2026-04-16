@@ -1,14 +1,3 @@
-"""
-app.py  —  ISL Greetings Flask App
-====================================
-Dependencies: tensorflow-cpu, flask, opencv-python-headless,
-              transformers==4.40.2, tokenizers>=0.15,<0.20
-ZERO torch. Runs on Render free tier.
-
-Intent model: TFBertForSequenceClassification (mBERT, TF SavedModel)
-Sign model  : CNN+BiLSTM Keras model (.keras)
-"""
-
 import os
 
 # ── CRITICAL: set BEFORE any transformers import ─────────────────
