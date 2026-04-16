@@ -1,113 +1,114 @@
-"""
-train_intent_model.py  –  Enhanced BERT-based intent classifier
-Improvements over baseline:
-  • Synonym / back-translation data augmentation (offline, pure-Python)
-  • Layer-wise learning-rate decay (discriminative fine-tuning)
-  • Label smoothing loss
-  • Cosine LR schedule with warm-up
-  • Mixed-precision training (if GPU available)
-  • Better evaluation: per-class + macro metrics
-Expected accuracy uplift: ~70 % → 90 %+
-"""
+import os
+import random
+import json
 
-import re, random, csv, os
-import pandas as pd
+# ── MUST be set before any other import ─────────────────────────
+os.environ["USE_TF"]                            = "1"
+os.environ["USE_TORCH"]                         = "0"
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"]              = "2"
+
 import numpy as np
-import torch
-from torch.utils.data import Dataset
+import pandas as pd
+import tensorflow as tf
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
-    accuracy_score, classification_report,
-    confusion_matrix, precision_recall_fscore_support
+    classification_report,
+    confusion_matrix,
+    precision_recall_fscore_support,
 )
-from transformers import (
-    BertTokenizer,
-    BertForSequenceClassification,
-    Trainer,
-    TrainingArguments,
-    get_cosine_schedule_with_warmup
-)
-import torch.nn as nn
 
-# ═══════════════════════════════════════════════
-# 1. CONFIGURATION
-# ═══════════════════════════════════════════════
-MODEL_NAME    = "bert-base-multilingual-cased"
-DATA_PATH     = "./data/train.csv"
-OUTPUT_DIR    = "./model"
-FINAL_DIR     = "./final_model"
-NUM_LABELS    = 9
-MAX_LENGTH    = 32
-BATCH_SIZE    = 16
-EPOCHS        = 20          # more epochs; early-stopping guards over-fit
-LEARNING_RATE = 3e-5
-WARMUP_RATIO  = 0.1
-AUG_FACTOR    = 4           # synthetic copies per original sample
+from transformers import (
+    BertTokenizerFast,
+    TFBertForSequenceClassification,
+    create_optimizer,
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# 1.  CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════
+MODEL_NAME   = "bert-base-multilingual-cased"
+DATA_PATH    = "./data/train.csv"
+OUTPUT_DIR   = "./final_model"
+NUM_LABELS   = 9
+MAX_LENGTH   = 32
+BATCH_SIZE   = 16
+EPOCHS       = 20
+LR           = 3e-5
+WARMUP_RATIO = 0.1
+AUG_FACTOR   = 6
+LABEL_SMOOTH = 0.1
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(FINAL_DIR,  exist_ok=True)
 
 LABEL2ID = {
     "HELLO": 0, "GOOD_MORNING": 1, "GOOD_AFTERNOON": 2,
     "GOOD_EVENING": 3, "GOOD_NIGHT": 4, "HOW_ARE_YOU": 5,
-    "ALRIGHT": 6, "PLEASED": 7, "THANK_YOU": 8
+    "ALRIGHT": 6, "PLEASED": 7, "THANK_YOU": 8,
 }
 ID2LABEL = {v: k for k, v in LABEL2ID.items()}
 
-# ═══════════════════════════════════════════════
-# 2. OFFLINE TEXT AUGMENTATION
-#    (no external API / library needed)
-# ═══════════════════════════════════════════════
+# Save label maps for app.py
+with open(os.path.join(OUTPUT_DIR, "id2label.json"), "w", encoding="utf-8") as f:
+    json.dump({str(k): v for k, v in ID2LABEL.items()}, f, ensure_ascii=False, indent=2)
+with open(os.path.join(OUTPUT_DIR, "label2id.json"), "w", encoding="utf-8") as f:
+    json.dump(LABEL2ID, f, ensure_ascii=False, indent=2)
 
-# Small synonym dict (English + Bengali key phrases)
+# ═══════════════════════════════════════════════════════════════════
+# 2.  TEXT AUGMENTATION  (pure Python — zero external libs)
+# ═══════════════════════════════════════════════════════════════════
 _SYNONYMS = {
     # English
-    "hello":      ["hi", "hey", "greetings", "howdy"],
-    "hi":         ["hello", "hey", "greetings"],
-    "hey":        ["hello", "hi", "yo"],
-    "morning":    ["dawn", "daybreak", "a.m."],
-    "good":       ["great", "wonderful", "fine", "nice"],
-    "afternoon":  ["midday", "noon", "daytime"],
-    "evening":    ["dusk", "twilight", "sundown"],
-    "night":      ["nighttime", "overnight", "late"],
-    "fine":       ["okay", "alright", "well", "good"],
-    "okay":       ["fine", "alright", "ok", "good"],
-    "alright":    ["okay", "fine", "good", "all right"],
-    "pleased":    ["glad", "happy", "delighted", "thrilled"],
-    "thank":      ["thanks", "grateful", "appreciate"],
-    "thanks":     ["thank you", "many thanks", "cheers"],
-    "meet":       ["see", "greet", "encounter"],
-    "doing":      ["feeling", "getting along", "faring"],
-    "how":        ["in what way", "tell me"],
-    "sleep":      ["rest", "slumber", "nap"],
-    "sweet":      ["pleasant", "lovely", "nice"],
-    "dreams":     ["sleep", "rest"],
-    # Bengali (transliterated for matching)
-    "ভালো":       ["চমৎকার", "সুন্দর", "উত্তম"],
-    "ধন্যবাদ":    ["কৃতজ্ঞ", "শুকরিয়া"],
-    "শুভ":        ["মঙ্গল", "কল্যাণ"],
+    "hello":     ["hi", "hey", "greetings", "howdy", "hiya"],
+    "hi":        ["hello", "hey", "greetings", "howdy"],
+    "hey":       ["hello", "hi", "yo", "howdy"],
+    "morning":   ["dawn", "daybreak", "early hours"],
+    "good":      ["great", "wonderful", "fine", "nice", "lovely"],
+    "afternoon": ["midday", "noon", "daytime"],
+    "evening":   ["dusk", "twilight", "sundown"],
+    "night":     ["nighttime", "overnight", "late evening"],
+    "fine":      ["okay", "alright", "well", "great"],
+    "okay":      ["fine", "alright", "ok", "good"],
+    "alright":   ["okay", "fine", "good", "all right"],
+    "pleased":   ["glad", "happy", "delighted", "thrilled"],
+    "thank":     ["thanks", "grateful", "appreciate"],
+    "thanks":    ["thank you", "many thanks", "cheers"],
+    "meet":      ["see", "greet", "encounter"],
+    "doing":     ["feeling", "faring", "holding up"],
+    "sleep":     ["rest", "slumber", "nap"],
+    "sweet":     ["pleasant", "lovely", "peaceful"],
+    "how":       ["in what way", "tell me how"],
+    "have":      ["get", "enjoy"],
+    # Bengali
+    "নমস্কার":   ["হ্যালো", "হাই", "প্রণাম"],
+    "ভালো":      ["চমৎকার", "সুন্দর", "উত্তম"],
+    "ধন্যবাদ":   ["কৃতজ্ঞ", "শুকরিয়া", "আপনাকে ধন্যবাদ"],
+    "শুভ":       ["মঙ্গল", "কল্যাণ", "সুন্দর"],
+    "সকাল":     ["ভোর", "প্রভাত"],
+    "সন্ধ্যা":   ["গোধূলি", "সন্ধ্যাবেলা"],
+    "রাত":       ["রাতে", "নিশি"],
+    "আছেন":     ["আছ", "আছো", "রয়েছেন"],
+    "কেমন":     ["কীভাবে", "কিরকম"],
+    "আপনি":     ["তুমি", "তুই"],
+    "খুশি":     ["আনন্দিত", "প্রসন্ন", "সুখী"],
 }
 
-def _replace_word(word: str) -> str:
-    key = word.lower().strip(".,!?")
-    if key in _SYNONYMS:
-        return random.choice(_SYNONYMS[key])
-    return word
+def _replace(w):
+    key = w.lower().strip(".,!?।")
+    return random.choice(_SYNONYMS[key]) if key in _SYNONYMS else w
 
-def synonym_replace(text: str, p: float = 0.25) -> str:
-    words = text.split()
-    return " ".join(
-        _replace_word(w) if random.random() < p else w
-        for w in words
-    )
+def synonym_replace(text, p=0.30):
+    return " ".join(_replace(w) if random.random() < p else w for w in text.split())
 
-def random_delete(text: str, p: float = 0.1) -> str:
+def random_delete(text, p=0.12):
     words = text.split()
     if len(words) <= 2:
         return text
-    return " ".join(w for w in words if random.random() > p)
+    kept = [w for w in words if random.random() > p]
+    return " ".join(kept) if kept else text
 
-def random_swap(text: str, n: int = 1) -> str:
+def random_swap(text, n=1):
     words = text.split()
     if len(words) < 2:
         return text
@@ -116,189 +117,223 @@ def random_swap(text: str, n: int = 1) -> str:
         words[i], words[j] = words[j], words[i]
     return " ".join(words)
 
-def augment_text(text: str, label: str, n: int = AUG_FACTOR):
-    """Return n augmented versions of text."""
-    ops   = [synonym_replace, random_delete, random_swap]
-    augmented = []
-    for _ in range(n):
-        op  = random.choice(ops)
-        aug = op(text)
-        if aug.strip() and aug != text:
-            augmented.append({"text": aug, "label": label})
-    return augmented
+def insert_word(text):
+    words = text.split()
+    if not words:
+        return text
+    syn = random.choice(list(_SYNONYMS.values()))
+    words.insert(random.randint(0, len(words)), random.choice(syn))
+    return " ".join(words)
 
-# ═══════════════════════════════════════════════
-# 3. LOAD & AUGMENT DATA
-# ═══════════════════════════════════════════════
+_OPS = [synonym_replace, random_delete, random_swap, insert_word]
+
+def augment(text, label, n=AUG_FACTOR):
+    out = []
+    for _ in range(n):
+        aug = random.choice(_OPS)(text)
+        if aug.strip() and aug != text:
+            out.append({"text": aug, "label": label})
+    return out
+
+# ═══════════════════════════════════════════════════════════════════
+# 3.  LOAD & AUGMENT DATA
+# ═══════════════════════════════════════════════════════════════════
 df = pd.read_csv(DATA_PATH)
 df["label_id"] = df["label"].map(LABEL2ID)
 
-augmented_rows = []
+aug_rows = []
 for _, row in df.iterrows():
-    augmented_rows.extend(augment_text(row["text"], row["label"]))
+    aug_rows.extend(augment(row["text"], row["label"]))
 
-aug_df           = pd.DataFrame(augmented_rows)
+aug_df             = pd.DataFrame(aug_rows)
 aug_df["label_id"] = aug_df["label"].map(LABEL2ID)
 
 full_df = pd.concat([df, aug_df], ignore_index=True).sample(frac=1, random_state=42)
 print(f"Total samples after augmentation: {len(full_df)}")
-print(full_df["label"].value_counts())
+print(full_df["label"].value_counts().to_string())
 
 train_df, val_df = train_test_split(
     full_df, test_size=0.15, random_state=42,
     stratify=full_df["label_id"]
 )
+print(f"\nTrain: {len(train_df)}  |  Val: {len(val_df)}")
 
-# ═══════════════════════════════════════════════
-# 4. DATASET
-# ═══════════════════════════════════════════════
-class IntentDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer):
-        self.texts, self.labels, self.tokenizer = texts, labels, tokenizer
+# ═══════════════════════════════════════════════════════════════════
+# 4.  TOKENISE  (return_tensors="tf" — pure TF tensors, no torch)
+# ═══════════════════════════════════════════════════════════════════
+tokenizer = BertTokenizerFast.from_pretrained(MODEL_NAME)
 
-    def __len__(self):
-        return len(self.texts)
+def tokenise(texts):
+    return tokenizer(
+        list(texts),
+        truncation=True,
+        padding="max_length",
+        max_length=MAX_LENGTH,
+        return_tensors="tf",
+    )
 
-    def __getitem__(self, idx):
-        enc = self.tokenizer(
-            self.texts[idx],
-            truncation=True, padding="max_length",
-            max_length=MAX_LENGTH, return_tensors="pt"
-        )
-        return {
-            "input_ids":      enc["input_ids"].squeeze(),
-            "attention_mask": enc["attention_mask"].squeeze(),
-            "labels":         torch.tensor(self.labels[idx], dtype=torch.long)
-        }
+train_enc = tokenise(train_df["text"])
+val_enc   = tokenise(val_df["text"])
 
-tokenizer    = BertTokenizer.from_pretrained(MODEL_NAME)
-train_dataset = IntentDataset(
-    train_df["text"].tolist(), train_df["label_id"].tolist(), tokenizer
-)
-val_dataset   = IntentDataset(
-    val_df["text"].tolist(),   val_df["label_id"].tolist(),   tokenizer
-)
+train_labels = tf.constant(train_df["label_id"].values, dtype=tf.int32)
+val_labels   = tf.constant(val_df["label_id"].values,   dtype=tf.int32)
 
-# ═══════════════════════════════════════════════
-# 5. MODEL  (with label smoothing)
-# ═══════════════════════════════════════════════
-base_model = BertForSequenceClassification.from_pretrained(
+def make_dataset(enc, labels, shuffle=False):
+    ds = tf.data.Dataset.from_tensor_slices((
+        {
+            "input_ids":      enc["input_ids"],
+            "attention_mask": enc["attention_mask"],
+        },
+        labels,
+    ))
+    if shuffle:
+        ds = ds.shuffle(2048)
+    return ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+
+train_ds = make_dataset(train_enc, train_labels, shuffle=True)
+val_ds   = make_dataset(val_enc,   val_labels)
+
+# ═══════════════════════════════════════════════════════════════════
+# 5.  MODEL
+#
+#     With torch UNINSTALLED:
+#       from_pt=True → HuggingFace sees no torch → falls back to
+#       downloading the native tf_model.h5 weights automatically.
+#
+#     With torch INSTALLED (even broken):
+#       from_pt=True → tries "import torch" → crashes.
+#       Solution: uninstall torch completely (see top of file).
+# ═══════════════════════════════════════════════════════════════════
+print("\nLoading mBERT TF weights (downloading ~700 MB on first run)...")
+print("This is fine — torch is not needed. Weights come as tf_model.h5.")
+
+model = TFBertForSequenceClassification.from_pretrained(
     MODEL_NAME,
-    num_labels=NUM_LABELS,
-    id2label=ID2LABEL,
-    label2id=LABEL2ID
+    num_labels = NUM_LABELS,
+    id2label   = ID2LABEL,
+    label2id   = LABEL2ID,
+    from_pt    = True,   # safe only when torch is NOT installed
 )
 
-# Label-smoothing wrapper
-class SmoothedTrainer(Trainer):
-    def __init__(self, *args, label_smoothing=0.1, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.label_smoothing = label_smoothing
+print("mBERT loaded successfully in TF mode.")
 
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-        labels = inputs.pop("labels")
-        outputs = model(**inputs)
-        logits  = outputs.logits
-        loss_fn = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
-        loss    = loss_fn(logits, labels)
-        return (loss, outputs) if return_outputs else loss
+# ── Cosine LR schedule with warm-up ─────────────────────────────
+num_train_steps  = len(train_ds) * EPOCHS
+num_warmup_steps = int(num_train_steps * WARMUP_RATIO)
 
-# ═══════════════════════════════════════════════
-# 6. METRICS
-# ═══════════════════════════════════════════════
-def compute_metrics(eval_pred):
-    logits, labels = eval_pred
-    preds = logits.argmax(axis=1)
-    p, r, f1, _ = precision_recall_fscore_support(labels, preds, average="macro", zero_division=0)
-    return {
-        "accuracy":  accuracy_score(labels, preds),
-        "macro_f1":  round(f1,  4),
-        "macro_prec": round(p,  4),
-        "macro_rec":  round(r,  4),
-    }
-
-# ═══════════════════════════════════════════════
-# 7. TRAINING ARGUMENTS
-# ═══════════════════════════════════════════════
-training_args = TrainingArguments(
-    output_dir                  = OUTPUT_DIR,
-    evaluation_strategy         = "epoch",
-    save_strategy               = "epoch",
-    learning_rate               = LEARNING_RATE,
-    per_device_train_batch_size = BATCH_SIZE,
-    per_device_eval_batch_size  = BATCH_SIZE,
-    num_train_epochs            = EPOCHS,
-    weight_decay                = 0.01,
-    warmup_ratio                = WARMUP_RATIO,
-    lr_scheduler_type           = "cosine",
-    logging_dir                 = "./logs",
-    logging_steps               = 10,
-    load_best_model_at_end      = True,
-    metric_for_best_model       = "macro_f1",
-    greater_is_better           = True,
-    fp16                        = torch.cuda.is_available(),   # mixed precision on GPU
-    save_total_limit            = 2,
-    report_to                   = "none"
+optimizer, _ = create_optimizer(
+    init_lr           = LR,
+    num_train_steps   = num_train_steps,
+    num_warmup_steps  = num_warmup_steps,
+    weight_decay_rate = 0.01,
 )
 
-# ═══════════════════════════════════════════════
-# 8. TRAIN
-# ═══════════════════════════════════════════════
-trainer = SmoothedTrainer(
-    label_smoothing = 0.1,
-    model           = base_model,
-    args            = training_args,
-    train_dataset   = train_dataset,
-    eval_dataset    = val_dataset,
-    tokenizer       = tokenizer,
-    compute_metrics = compute_metrics
+# ── Label-smoothing loss ─────────────────────────────────────────
+def smooth_loss(y_true, logits):
+    y_true   = tf.cast(tf.squeeze(y_true), tf.int32)
+    num_cls  = tf.shape(logits)[-1]
+    y_oh     = tf.one_hot(y_true, num_cls)
+    y_smooth = (y_oh * (1.0 - LABEL_SMOOTH)
+                + LABEL_SMOOTH / tf.cast(num_cls, tf.float32))
+    log_prob = tf.nn.log_softmax(logits, axis=-1)
+    return -tf.reduce_mean(tf.reduce_sum(y_smooth * log_prob, axis=-1))
+
+model.compile(
+    optimizer = optimizer,
+    loss      = smooth_loss,
+    metrics   = [tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")],
 )
 
-trainer.train()
+# ═══════════════════════════════════════════════════════════════════
+# 6.  CALLBACKS
+# ═══════════════════════════════════════════════════════════════════
+CKPT_PATH = os.path.join(OUTPUT_DIR, "best_weights")
 
-# ═══════════════════════════════════════════════
-# 9. FINAL EVALUATION
-# ═══════════════════════════════════════════════
-preds_output = trainer.predict(val_dataset)
-preds        = preds_output.predictions.argmax(axis=1)
-true_labels  = val_df["label_id"].values
-class_names  = [ID2LABEL[i] for i in range(NUM_LABELS)]
+callbacks = [
+    tf.keras.callbacks.ModelCheckpoint(
+        filepath          = CKPT_PATH,
+        monitor           = "val_accuracy",
+        save_best_only    = True,
+        save_weights_only = True,
+        mode              = "max",
+        verbose           = 1,
+    ),
+    tf.keras.callbacks.EarlyStopping(
+        monitor               = "val_accuracy",
+        patience              = 5,
+        restore_best_weights  = True,
+        verbose               = 1,
+    ),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor  = "val_loss",
+        factor   = 0.5,
+        patience = 3,
+        min_lr   = 1e-7,
+        verbose  = 1,
+    ),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 7.  TRAIN
+# ═══════════════════════════════════════════════════════════════════
+history = model.fit(
+    train_ds,
+    validation_data = val_ds,
+    epochs          = EPOCHS,
+    callbacks       = callbacks,
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# 8.  EVALUATE
+# ═══════════════════════════════════════════════════════════════════
+all_logits = model.predict(val_ds).logits
+preds      = np.argmax(all_logits, axis=1)
+true       = val_df["label_id"].values
+names      = [ID2LABEL[i] for i in range(NUM_LABELS)]
 
 print("\n=== Classification Report ===")
-print(classification_report(true_labels, preds, target_names=class_names))
+print(classification_report(true, preds, target_names=names, zero_division=0))
 
-cm    = confusion_matrix(true_labels, preds)
-cm_df = pd.DataFrame(cm, index=class_names, columns=class_names)
-cm_df.to_csv(f"{OUTPUT_DIR}/confusion_matrix.csv")
+p, r, f1, sup = precision_recall_fscore_support(
+    true, preds, average=None, zero_division=0
+)
+pd.DataFrame({
+    "label": names, "precision": p,
+    "recall": r, "f1_score": f1, "support": sup,
+}).to_csv(os.path.join(OUTPUT_DIR, "per_class_metrics.csv"), index=False)
 
-precision, recall, f1, support = precision_recall_fscore_support(
-    true_labels, preds, average=None, zero_division=0
+mp, mr, mf1, _ = precision_recall_fscore_support(
+    true, preds, average="macro", zero_division=0
 )
-metrics_df = pd.DataFrame({
-    "label": class_names, "precision": precision,
-    "recall": recall, "f1_score": f1, "support": support
-})
-metrics_df.to_csv(f"{OUTPUT_DIR}/per_class_metrics.csv", index=False)
-
-macro_p, macro_r, macro_f1, _ = precision_recall_fscore_support(
-    true_labels, preds, average="macro", zero_division=0
+wp, wr, wf1, _ = precision_recall_fscore_support(
+    true, preds, average="weighted", zero_division=0
 )
-w_p, w_r, w_f1, _ = precision_recall_fscore_support(
-    true_labels, preds, average="weighted", zero_division=0
-)
-summary_df = pd.DataFrame({
+pd.DataFrame({
     "average_type": ["macro", "weighted"],
-    "precision":    [macro_p, w_p],
-    "recall":       [macro_r, w_r],
-    "f1_score":     [macro_f1, w_f1]
-})
-summary_df.to_csv(f"{OUTPUT_DIR}/summary_metrics.csv", index=False)
+    "precision":    [mp, wp],
+    "recall":       [mr, wr],
+    "f1_score":     [mf1, wf1],
+}).to_csv(os.path.join(OUTPUT_DIR, "summary_metrics.csv"), index=False)
 
-print("\nAll metrics saved.")
+cm = confusion_matrix(true, preds)
+pd.DataFrame(cm, index=names, columns=names).to_csv(
+    os.path.join(OUTPUT_DIR, "confusion_matrix.csv")
+)
+print("All metrics saved.")
 
-# ═══════════════════════════════════════════════
-# 10. SAVE TO final_model/  (used by Flask app)
-# ═══════════════════════════════════════════════
-trainer.save_model(FINAL_DIR)
-tokenizer.save_pretrained(FINAL_DIR)
-print(f"Model saved → {FINAL_DIR}")
+# ═══════════════════════════════════════════════════════════════════
+# 9.  SAVE as TF SavedModel  (app.py loads with from_pretrained)
+#     Produces:
+#       final_model/config.json
+#       final_model/tf_model.h5    ← native TF weights, no torch needed
+#       final_model/vocab.txt      ← tokenizer files
+#       final_model/tokenizer_config.json
+#       final_model/special_tokens_map.json
+# ═══════════════════════════════════════════════════════════════════
+model.save_pretrained(OUTPUT_DIR)
+tokenizer.save_pretrained(OUTPUT_DIR)
+
+print(f"\nModel saved    → {OUTPUT_DIR}/tf_model.h5")
+print(f"Tokenizer saved → {OUTPUT_DIR}/")
+print("\napp.py loads this with TFBertForSequenceClassification.from_pretrained()")
+print("Torch is NOT needed to load tf_model.h5 — it is native TF format.")

@@ -1,10 +1,10 @@
-final_model/
-model/
 __pycache__/
 *.pyc
-venv/
+*.pyo
 .env
-*.keras
-*.h5
-*.pt
-*.pth
+venv/
+sequences/
+*.npy
+logs/
+model/
+final_model/
