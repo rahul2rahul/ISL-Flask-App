@@ -7,7 +7,7 @@ os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 
 import random, base64, cv2, json
 import numpy as np
-
+from huggingface_hub import hf_hub_download
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
@@ -64,23 +64,29 @@ LABEL_TO_DISPLAY = {
 #         tf_model.h5          ← TF weights saved by save_pretrained()
 #         tokenizer files      ← vocab.txt, tokenizer_config.json, etc.
 # ═══════════════════════════════════════════════════════════════════
-INTENT_MODEL_PATH = "rahul2025/isl"
+HF_MODEL_ID = "rahul2025/isl"
 
-tokenizer    = BertTokenizerFast.from_pretrained(INTENT_MODEL_PATH)
+tokenizer = BertTokenizerFast.from_pretrained(HF_MODEL_ID)
+
 intent_model = TFBertForSequenceClassification.from_pretrained(
-    INTENT_MODEL_PATH,
-    num_labels = len(LABEL2ID),
-    id2label   = ID2LABEL,
-    label2id   = LABEL2ID,
+    HF_MODEL_ID,
+    from_pt=True,   # 🔥 REQUIRED (PyTorch → TF conversion)
+    num_labels=len(LABEL2ID),
+    id2label=ID2LABEL,
+    label2id=LABEL2ID,
 )
 
 # ═══════════════════════════════════════════════════════════════════
 # 3.  LOAD SIGN MODEL  (CNN+BiLSTM Keras)
 # ═══════════════════════════════════════════════════════════════════
-SIGN_MODEL_PATH = "./model/model_cnn_bilstm.keras"
-LABEL_MAP_PATH  = "./model/label_map.json"
+from huggingface_hub import hf_hub_download
 
-sign_model   = load_model(SIGN_MODEL_PATH)
+model_path = hf_hub_download(
+    repo_id="rahul2025/isl-sign",
+    filename="model_cnn_bilstm.keras"
+)
+
+sign_model = load_model(model_path)
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 
