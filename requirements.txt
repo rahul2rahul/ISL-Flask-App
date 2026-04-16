@@ -5,3 +5,7 @@ opencv-python-headless==4.8.1.78
 tensorflow==2.13.1
 transformers==4.40.2
 tokenizers>=0.15,<0.20
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
+pandas>=2.0.0
+scikit-learn>=1.4.0
