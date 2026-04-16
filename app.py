@@ -64,7 +64,7 @@ LABEL_TO_DISPLAY = {
 #         tf_model.h5          ← TF weights saved by save_pretrained()
 #         tokenizer files      ← vocab.txt, tokenizer_config.json, etc.
 # ═══════════════════════════════════════════════════════════════════
-INTENT_MODEL_PATH = "./final_model"
+INTENT_MODEL_PATH = "rahul2025/isl"
 
 tokenizer    = BertTokenizerFast.from_pretrained(INTENT_MODEL_PATH)
 intent_model = TFBertForSequenceClassification.from_pretrained(
