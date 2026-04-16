@@ -2,10 +2,15 @@
 flask==3.0.3
 gunicorn==22.0.0
 
-# ── TensorFlow (CPU-only slim build — saves ~300 MB vs full wheel) ─
+# ── TensorFlow CPU-only (saves ~300 MB vs full GPU build) ─────────
 tensorflow-cpu==2.15.1
 
-# ── HuggingFace (TF backend, NO torch) ────────────────────────────
+# ── PyTorch CPU-only (needed ONLY for from_pt=True weight loading) ─
+# Install the CPU wheel directly — avoids the 700 MB CUDA build
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+
+# ── HuggingFace ───────────────────────────────────────────────────
 transformers==4.40.2
 huggingface-hub==0.23.4
 tokenizers==0.19.1
