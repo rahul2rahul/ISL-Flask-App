@@ -1,32 +1,31 @@
 import os
 import gc
 import sys
-
-# ── CRITICAL: set BEFORE any transformers import ─────────────────
-os.environ["USE_TF"]                            = "1"
-os.environ["USE_TORCH"]                         = "0"
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
-os.environ["TF_CPP_MIN_LOG_LEVEL"]             = "3"
-os.environ["CUDA_VISIBLE_DEVICES"]             = ""
-os.environ["TF_ENABLE_ONEDNN_OPTS"]            = "0"
-
 import random, base64, cv2, json, logging
 import numpy as np
 import tensorflow as tf
-
-tf.config.threading.set_intra_op_parallelism_threads(1)
-tf.config.threading.set_inter_op_parallelism_threads(1)
+import requests
+import time
 
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from flask import Flask, render_template, request, jsonify, url_for
-
-from transformers import BertTokenizerFast, TFBertForSequenceClassification
 from huggingface_hub import hf_hub_download
+
+# ── ENV ─────────────────────────────────────────────
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
 
 HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
 
-# ── logging ───────────────────────────────────────────────────────
+# Hugging Face API (NO MODEL LOADING LOCALLY)
+API_URL = "https://api-inference.huggingface.co/models/rahul2025/isl"
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+# ── logging ─────────────────────────────────────────
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
@@ -36,187 +35,119 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-
-LABEL2ID = {
-    "HELLO": 0, "GOOD_MORNING": 1, "GOOD_AFTERNOON": 2,
-    "GOOD_EVENING": 3, "GOOD_NIGHT": 4, "HOW_ARE_YOU": 5,
-    "ALRIGHT": 6, "PLEASED": 7, "THANK_YOU": 8,
-}
-ID2LABEL = {v: k for k, v in LABEL2ID.items()}
-
+# ── LABEL MAPS ─────────────────────────────────────
 LABEL_TO_BENGALI = {
-    "HELLO":          "হ্যালো",
-    "GOOD_MORNING":   "শুভ সকাল",
+    "HELLO": "হ্যালো",
+    "GOOD_MORNING": "শুভ সকাল",
     "GOOD_AFTERNOON": "শুভ অপরাহ্ন",
-    "GOOD_EVENING":   "শুভ সন্ধ্যা",
-    "GOOD_NIGHT":     "শুভ রাত্রি",
-    "HOW_ARE_YOU":    "আপনি কেমন আছেন",
-    "ALRIGHT":        "সব ঠিক আছে",
-    "PLEASED":        "খুশি",
-    "THANK_YOU":      "ধন্যবাদ",
+    "GOOD_EVENING": "শুভ সন্ধ্যা",
+    "GOOD_NIGHT": "শুভ রাত্রি",
+    "HOW_ARE_YOU": "আপনি কেমন আছেন",
+    "ALRIGHT": "সব ঠিক আছে",
+    "PLEASED": "খুশি",
+    "THANK_YOU": "ধন্যবাদ",
 }
 
 LABEL_TO_DISPLAY = {
-    "HELLO":          "Hello",
-    "GOOD_MORNING":   "Good Morning",
+    "HELLO": "Hello",
+    "GOOD_MORNING": "Good Morning",
     "GOOD_AFTERNOON": "Good Afternoon",
-    "GOOD_EVENING":   "Good Evening",
-    "GOOD_NIGHT":     "Good Night",
-    "HOW_ARE_YOU":    "How Are You?",
-    "ALRIGHT":        "Alright / I'm Fine",
-    "PLEASED":        "Pleased to Meet You",
-    "THANK_YOU":      "Thank You",
+    "GOOD_EVENING": "Good Evening",
+    "GOOD_NIGHT": "Good Night",
+    "HOW_ARE_YOU": "How Are You?",
+    "ALRIGHT": "Alright / I'm Fine",
+    "PLEASED": "Pleased to Meet You",
+    "THANK_YOU": "Thank You",
 }
 
-# ═══════════════════════════════════════════════════════════════════
-# 2.  LAZY-LOAD GLOBALS
-# ═══════════════════════════════════════════════════════════════════
-_tokenizer    = None
-_intent_model = None
-_sign_model   = None
-_label_map    = None
+# ── SIGN MODEL ─────────────────────────────────────
+_sign_model = None
+_label_map = None
 
 SEQ_LEN_SIGN = 15
-IMG_SIZE     = 96
-HF_MODEL_ID  = "rahul2025/isl"
-HF_SIGN_ID   = "rahul2025/isl-sign"
-
-
-def get_tokenizer():
-    global _tokenizer
-    if _tokenizer is None:
-        log.info("Loading tokenizer from %s …", HF_MODEL_ID)
-        _tokenizer = BertTokenizerFast.from_pretrained(
-            HF_MODEL_ID,
-            token=HF_TOKEN or None,
-        )
-        log.info("Tokenizer ready.")
-    return _tokenizer
-
-
-def get_intent_model():
-    global _intent_model
-    if _intent_model is None:
-        log.info("Loading intent model from %s …", HF_MODEL_ID)
-
-        # Try loading — supports both safetensors and pytorch_model.bin.
-        # from_pt=True tells transformers to treat the source as PyTorch
-        # weights and convert to TF in-memory (no torch needed at runtime
-        # for this conversion path in transformers >= 4.20).
-        _intent_model = TFBertForSequenceClassification.from_pretrained(
-            HF_MODEL_ID,
-            from_pt    = True,
-            num_labels = len(LABEL2ID),
-            id2label   = ID2LABEL,
-            label2id   = LABEL2ID,
-            token      = HF_TOKEN or None,
-        )
-        log.info("Intent model ready.")
-        gc.collect()
-    return _intent_model
+IMG_SIZE = 96
+HF_SIGN_ID = "rahul2025/isl-sign"
 
 
 def get_sign_model():
     global _sign_model, _label_map
 
     if _sign_model is None:
-        log.info("Downloading sign model from %s …", HF_SIGN_ID)
+        log.info("Downloading sign model...")
         model_path = hf_hub_download(
-            repo_id  = HF_SIGN_ID,
-            filename = "model_cnn_bilstm.keras",
-            token    = HF_TOKEN or None,
+            repo_id=HF_SIGN_ID,
+            filename="model_cnn_bilstm.keras",
+            token=HF_TOKEN,
         )
         _sign_model = load_model(model_path, compile=False)
-        log.info("Sign model ready.")
         gc.collect()
 
     if _label_map is None:
         label_map_path = hf_hub_download(
-            repo_id  = HF_SIGN_ID,
-            filename = "label_map.json",
-            token    = HF_TOKEN or None,
+            repo_id=HF_SIGN_ID,
+            filename="label_map.json",
+            token=HF_TOKEN,
         )
-        with open(label_map_path, encoding="utf-8") as f:
+        with open(label_map_path) as f:
             _label_map = json.load(f)
-        log.info("Label map ready (%d classes).", len(_label_map))
 
     return _sign_model, _label_map
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 3.  INFERENCE HELPERS
-# ═══════════════════════════════════════════════════════════════════
-def predict_intent(text: str):
-    tok   = get_tokenizer()
-    model = get_intent_model()
+# ── TEXT PREDICTION (API) ──────────────────────────
+def predict_intent(text):
+    for _ in range(3):
+        response = requests.post(API_URL, headers=headers, json={"inputs": text})
+        result = response.json()
 
-    encoded = tok(
-        text,
-        return_tensors = "tf",
-        truncation     = True,
-        padding        = True,
-        max_length     = 32,
-    )
-    outputs = model(**encoded, training=False)
-    probs   = tf.nn.softmax(outputs.logits, axis=-1)
-    idx     = int(tf.argmax(probs, axis=-1).numpy()[0])
-    conf    = float(probs.numpy()[0][idx])
-    label   = ID2LABEL.get(idx, "UNKNOWN")
-    return label, round(conf, 4)
+        if isinstance(result, dict) and "error" in result:
+            if "loading" in result["error"]:
+                time.sleep(3)
+                continue
+            return "ERROR", 0.0
+
+        return result[0][0]["label"], round(result[0][0]["score"], 4)
+
+    return "ERROR", 0.0
 
 
+# ── FRAME HELPERS ──────────────────────────────────
 def decode_frames(frame_b64_list):
     frames = []
     for b64 in frame_b64_list:
         if "," in b64:
             b64 = b64.split(",", 1)[1]
         try:
-            img_bytes = base64.b64decode(b64)
-            arr       = np.frombuffer(img_bytes, np.uint8)
-            frame     = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            arr = np.frombuffer(base64.b64decode(b64), np.uint8)
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if frame is not None:
                 frames.append(frame)
-        except Exception as e:
-            log.warning("Skipping bad frame: %s", e)
+        except:
+            pass
     return frames
 
 
 def frames_to_clip(frames):
-    n       = len(frames)
-    indices = np.linspace(0, n - 1, SEQ_LEN_SIGN, dtype=int)
-    clip    = []
+    indices = np.linspace(0, len(frames) - 1, SEQ_LEN_SIGN, dtype=int)
+    clip = []
     for i in indices:
-        rgb     = cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB)
         resized = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
         clip.append(resized.astype("float32"))
-    clip = np.array(clip)
-    clip = preprocess_input(clip)
+    clip = preprocess_input(np.array(clip))
     return clip[np.newaxis, ...]
 
 
 def get_video_for_label(label):
-    videos       = []
-    video_folder = os.path.join(app.static_folder, "videos", label)
-    if os.path.exists(video_folder):
-        files = [f for f in os.listdir(video_folder) if f.endswith(".mp4")]
+    folder = os.path.join(app.static_folder, "videos", label)
+    if os.path.exists(folder):
+        files = [f for f in os.listdir(folder) if f.endswith(".mp4")]
         if files:
-            selected = random.choice(files)
-            videos.append(url_for("static", filename=f"videos/{label}/{selected}"))
-    return videos
+            return [url_for("static", filename=f"videos/{label}/{random.choice(files)}")]
+    return []
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 4.  GLOBAL ERROR HANDLER — always JSON, never HTML
-# ═══════════════════════════════════════════════════════════════════
-@app.errorhandler(Exception)
-def handle_exception(e):
-    log.exception("Unhandled exception")
-    return jsonify({"error": str(e)}), 500
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 5.  ROUTES
-# ═══════════════════════════════════════════════════════════════════
+# ── ROUTES ─────────────────────────────────────────
 @app.route("/")
 def home():
     return render_template("home.html")
@@ -224,68 +155,51 @@ def home():
 
 @app.route("/process_speech", methods=["POST"])
 def process_speech():
-    try:
-        data = request.get_json(force=True, silent=True) or {}
-        text = data.get("text", "").strip()
-        if not text:
-            return jsonify({"error": "No input text"}), 400
+    data = request.get_json() or {}
+    text = data.get("text", "").strip()
 
-        log.info("Speech input: %r", text)
-        intent_label, confidence = predict_intent(text)
-        log.info("→ Intent: %s  conf=%.2f", intent_label, confidence)
+    if not text:
+        return jsonify({"error": "No input text"}), 400
 
-        return jsonify({
-            "input_text":      text,
-            "predicted_label": intent_label,
-            "display_name":    LABEL_TO_DISPLAY.get(intent_label, intent_label),
-            "bengali":         LABEL_TO_BENGALI.get(intent_label, ""),
-            "confidence":      confidence,
-            "videos":          get_video_for_label(intent_label),
-        })
-    except Exception as e:
-        log.exception("process_speech failed")
-        return jsonify({"error": str(e)}), 500
+    label, conf = predict_intent(text)
+
+    return jsonify({
+        "input_text": text,
+        "predicted_label": label,
+        "display_name": LABEL_TO_DISPLAY.get(label, label),
+        "bengali": LABEL_TO_BENGALI.get(label, ""),
+        "confidence": conf,
+        "videos": get_video_for_label(label),
+    })
 
 
 @app.route("/predict_sign", methods=["POST"])
 def predict_sign():
-    try:
-        data       = request.get_json(force=True, silent=True) or {}
-        frame_list = data.get("frames", [])
-        if not frame_list:
-            return jsonify({"error": "No frames received"}), 400
+    data = request.get_json() or {}
+    frames = decode_frames(data.get("frames", []))
 
-        frames = decode_frames(frame_list)
-        if len(frames) < 5:
-            return jsonify({
-                "error": f"Too few valid frames ({len(frames)} decoded, need ≥ 5)"
-            }), 400
+    if len(frames) < 5:
+        return jsonify({"error": "Too few frames"}), 400
 
-        sign_model, label_map = get_sign_model()
+    model, label_map = get_sign_model()
 
-        clip            = frames_to_clip(frames)
-        preds           = sign_model.predict(clip, verbose=0)
-        class_idx       = int(np.argmax(preds[0]))
-        confidence      = float(np.max(preds[0]))
-        predicted_label = label_map.get(str(class_idx), "UNKNOWN")
+    clip = frames_to_clip(frames)
+    preds = model.predict(clip, verbose=0)
 
-        log.info("→ Sign: %s  conf=%.2f", predicted_label, confidence)
+    idx = int(np.argmax(preds[0]))
+    conf = float(np.max(preds[0]))
+    label = label_map.get(str(idx), "UNKNOWN")
 
-        return jsonify({
-            "predicted_label": predicted_label,
-            "display_name":    LABEL_TO_DISPLAY.get(predicted_label, predicted_label),
-            "bengali":         LABEL_TO_BENGALI.get(predicted_label, ""),
-            "confidence":      round(confidence, 4),
-            "videos":          get_video_for_label(predicted_label),
-        })
-    except Exception as e:
-        log.exception("predict_sign failed")
-        return jsonify({"error": str(e)}), 500
+    return jsonify({
+        "predicted_label": label,
+        "display_name": LABEL_TO_DISPLAY.get(label, label),
+        "bengali": LABEL_TO_BENGALI.get(label, ""),
+        "confidence": round(conf, 4),
+        "videos": get_video_for_label(label),
+    })
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 6.  ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════
+# ── ENTRY ──────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
