@@ -12,7 +12,6 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"]            = "0"
 
 import random, base64, cv2, json, logging
 import numpy as np
-from huggingface_hub import hf_hub_download
 import tensorflow as tf
 
 tf.config.threading.set_intra_op_parallelism_threads(1)
@@ -21,6 +20,7 @@ tf.config.threading.set_inter_op_parallelism_threads(1)
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from flask import Flask, render_template, request, jsonify, url_for
+from huggingface_hub import hf_hub_download, login
 from transformers import BertTokenizerFast, TFBertForSequenceClassification
 
 # ── logging ───────────────────────────────────────────────────────
@@ -32,6 +32,19 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# ═══════════════════════════════════════════════════════════════════
+# 0.  AUTHENTICATE WITH HUGGINGFACE  (reads env var set in Render)
+# ═══════════════════════════════════════════════════════════════════
+HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN", "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").strip()
+if HF_TOKEN:
+    login(token=HF_TOKEN, add_to_git_credential=False)
+    log.info("HuggingFace login successful.")
+else:
+    log.warning(
+        "HUGGINGFACE_TOKEN not set — private repos will be inaccessible. "
+        "Add it in Render → Environment."
+    )
 
 # ═══════════════════════════════════════════════════════════════════
 # 1.  LABEL MAPS
@@ -78,13 +91,17 @@ _label_map    = None
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 HF_MODEL_ID  = "rahul2025/isl"
+HF_SIGN_ID   = "rahul2025/isl-sign"
 
 
 def get_tokenizer():
     global _tokenizer
     if _tokenizer is None:
-        log.info("Loading tokenizer …")
-        _tokenizer = BertTokenizerFast.from_pretrained(HF_MODEL_ID)
+        log.info("Loading tokenizer from %s …", HF_MODEL_ID)
+        _tokenizer = BertTokenizerFast.from_pretrained(
+            HF_MODEL_ID,
+            token=HF_TOKEN or None,
+        )
         log.info("Tokenizer ready.")
     return _tokenizer
 
@@ -92,20 +109,19 @@ def get_tokenizer():
 def get_intent_model():
     global _intent_model
     if _intent_model is None:
-        log.info("Loading intent model …")
-        # ------------------------------------------------------------------
-        # YOUR HF repo (rahul2025/isl) stores PyTorch weights only.
-        # from_pt=True normally works but needs torch.  Since Render has no
-        # torch, we download the raw pytorch_model.bin and convert in-process
-        # using transformers' built-in PT→TF conversion which only needs the
-        # .bin file on disk — it does NOT import torch at runtime.
-        # ------------------------------------------------------------------
+        log.info("Loading intent model from %s …", HF_MODEL_ID)
+
+        # Try loading — supports both safetensors and pytorch_model.bin.
+        # from_pt=True tells transformers to treat the source as PyTorch
+        # weights and convert to TF in-memory (no torch needed at runtime
+        # for this conversion path in transformers >= 4.20).
         _intent_model = TFBertForSequenceClassification.from_pretrained(
             HF_MODEL_ID,
-            from_pt    = True,      # transformers handles PT→TF conversion
+            from_pt    = True,
             num_labels = len(LABEL2ID),
             id2label   = ID2LABEL,
             label2id   = LABEL2ID,
+            token      = HF_TOKEN or None,
         )
         log.info("Intent model ready.")
         gc.collect()
@@ -114,11 +130,13 @@ def get_intent_model():
 
 def get_sign_model():
     global _sign_model, _label_map
+
     if _sign_model is None:
-        log.info("Downloading sign model …")
+        log.info("Downloading sign model from %s …", HF_SIGN_ID)
         model_path = hf_hub_download(
-            repo_id  = "rahul2025/isl-sign",
+            repo_id  = HF_SIGN_ID,
             filename = "model_cnn_bilstm.keras",
+            token    = HF_TOKEN or None,
         )
         _sign_model = load_model(model_path, compile=False)
         log.info("Sign model ready.")
@@ -126,8 +144,9 @@ def get_sign_model():
 
     if _label_map is None:
         label_map_path = hf_hub_download(
-            repo_id  = "rahul2025/isl-sign",
+            repo_id  = HF_SIGN_ID,
             filename = "label_map.json",
+            token    = HF_TOKEN or None,
         )
         with open(label_map_path, encoding="utf-8") as f:
             _label_map = json.load(f)
@@ -199,7 +218,7 @@ def get_video_for_label(label):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 4.  GLOBAL ERROR HANDLER — always returns JSON, never an HTML page
+# 4.  GLOBAL ERROR HANDLER — always JSON, never HTML
 # ═══════════════════════════════════════════════════════════════════
 @app.errorhandler(Exception)
 def handle_exception(e):
