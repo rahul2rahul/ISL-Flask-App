@@ -66,7 +66,7 @@ _label_map = None
 
 SEQ_LEN_SIGN = 15
 IMG_SIZE = 96
-HF_SIGN_ID = "rahul2025/isl-sign"
+HF_SIGN_ID = "rahul2025/isl"
 
 
 def get_sign_model():
@@ -94,21 +94,41 @@ def get_sign_model():
     return _sign_model, _label_map
 
 
-# ── TEXT PREDICTION (API) ──────────────────────────
-def predict_intent(text):
-    for _ in range(3):
-        response = requests.post(API_URL, headers=headers, json={"inputs": text})
-        result = response.json()
 
-        if isinstance(result, dict) and "error" in result:
-            if "loading" in result["error"]:
-                time.sleep(3)
-                continue
-            return "ERROR", 0.0
+import requests as real_requests
 
-        return result[0][0]["label"], round(result[0][0]["score"], 4)
+import requests
 
-    return "ERROR", 0.0
+def predict_intent(text: str):
+    HF_MODEL_ID = "distilbert-base-uncased-finetuned-sst-2-english"
+    API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
+
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}"
+    }
+
+    payload = {
+        "inputs": text
+    }
+
+    print("CALLING URL:", API_URL)
+
+    response = requests.post(API_URL, headers=headers, json=payload)
+
+    print("STATUS:", response.status_code)
+    print("RAW RESPONSE:", response.text)
+
+    if response.status_code != 200:
+        return "ERROR", 0.0
+
+    result = response.json()
+
+    if isinstance(result, list) and len(result) > 0:
+        label = result[0]["label"]
+        score = result[0]["score"]
+        return label, round(score, 4)
+
+    return "UNKNOWN", 0.0
 
 
 # ── FRAME HELPERS ──────────────────────────────────
