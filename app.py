@@ -20,8 +20,11 @@ tf.config.threading.set_inter_op_parallelism_threads(1)
 from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from flask import Flask, render_template, request, jsonify, url_for
-from huggingface_hub import hf_hub_download, login
+
 from transformers import BertTokenizerFast, TFBertForSequenceClassification
+from huggingface_hub import hf_hub_download
+
+HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
 
 # ── logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -33,22 +36,7 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# ═══════════════════════════════════════════════════════════════════
-# 0.  AUTHENTICATE WITH HUGGINGFACE  (reads env var set in Render)
-# ═══════════════════════════════════════════════════════════════════
-HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN", "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").strip()
-if HF_TOKEN:
-    login(token=HF_TOKEN, add_to_git_credential=False)
-    log.info("HuggingFace login successful.")
-else:
-    log.warning(
-        "HUGGINGFACE_TOKEN not set — private repos will be inaccessible. "
-        "Add it in Render → Environment."
-    )
 
-# ═══════════════════════════════════════════════════════════════════
-# 1.  LABEL MAPS
-# ═══════════════════════════════════════════════════════════════════
 LABEL2ID = {
     "HELLO": 0, "GOOD_MORNING": 1, "GOOD_AFTERNOON": 2,
     "GOOD_EVENING": 3, "GOOD_NIGHT": 4, "HOW_ARE_YOU": 5,
