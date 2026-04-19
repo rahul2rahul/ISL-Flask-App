@@ -1,11 +1,3 @@
-"""
-app.py  —  ISL Flask App for Render
-=====================================
-- BERT intent: runs on HF Space (no memory cost on Render)
-- Sign model : loaded from HF Hub (CNN+BiLSTM Keras, TF only)
-- NO torch, NO transformers loaded here
-"""
-
 import os
 import gc
 import sys
