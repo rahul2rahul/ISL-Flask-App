@@ -28,7 +28,6 @@
       --radius-lg:   24px;
     }
 
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
 
@@ -41,7 +40,6 @@
       min-height: 100vh;
       overflow-x: hidden;
     }
-
 
     body::before {
       content: '';
@@ -64,11 +62,7 @@
       z-index: 0;
     }
 
-    /* ──────────────────────────────────────────
-       LAYOUT WRAPPER
-    ────────────────────────────────────────── */
     .page { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 0 20px 80px; }
-
 
     header {
       display: flex;
@@ -91,9 +85,7 @@
       box-shadow: 0 0 28px var(--glow);
     }
 
-    .brand {
-      display: flex; flex-direction: column;
-    }
+    .brand { display: flex; flex-direction: column; }
     .brand-title {
       font-family: 'Syne', sans-serif;
       font-weight: 800;
@@ -123,7 +115,6 @@
       50%      { opacity: .5; transform: scale(1.4); }
     }
 
-
     .hero {
       text-align: center;
       padding: 64px 0 48px;
@@ -143,7 +134,6 @@
     .hero-title span { color: var(--accent); }
     .hero-desc { color: var(--muted); max-width: 520px; margin: 0 auto; font-size: 15px; }
 
-
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -153,7 +143,6 @@
     @media (max-width: 680px) {
       .grid-2 { grid-template-columns: 1fr; }
     }
-
 
     .card {
       background: var(--card);
@@ -173,6 +162,7 @@
       opacity: .7;
     }
     .card-accent-bar.teal { background: linear-gradient(90deg, var(--accent3), #5b6ef5); }
+    .card-accent-bar.purple { background: linear-gradient(90deg, #8f57fb, #e96ef5); }
 
     .card-icon {
       width: 42px; height: 42px;
@@ -187,6 +177,10 @@
       background: rgba(61,214,200,.1);
       border-color: rgba(61,214,200,.2);
     }
+    .card-icon.purple {
+      background: rgba(143,87,251,.12);
+      border-color: rgba(143,87,251,.25);
+    }
 
     .card-title {
       font-family: 'Syne', sans-serif;
@@ -194,7 +188,6 @@
       margin-bottom: 6px;
     }
     .card-desc { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-
 
     .btn {
       display: inline-flex;
@@ -236,6 +229,15 @@
     }
     .btn-teal:hover { transform: translateY(-1px); }
 
+    .btn-purple {
+      background: linear-gradient(135deg, #8f57fb, #c45ef5);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 4px 20px rgba(143,87,251,.35);
+    }
+    .btn-purple:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(143,87,251,.45); }
+    .btn-purple:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
     .btn-outline {
       background: transparent;
       border: 1px solid var(--border);
@@ -247,7 +249,6 @@
 
     .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-
     .chip {
       display: inline-flex;
       align-items: center;
@@ -257,10 +258,10 @@
       font-size: 12px;
       font-weight: 500;
     }
-    .chip-blue { background: rgba(91,110,245,.12); color: #97a4ff; border: 1px solid rgba(91,110,245,.2); }
-    .chip-teal { background: rgba(61,214,200,.1);  color: var(--accent3); border: 1px solid rgba(61,214,200,.2); }
-    .chip-red  { background: rgba(245,91,91,.1);   color: #ff9090; border: 1px solid rgba(245,91,91,.2); }
-
+    .chip-blue   { background: rgba(91,110,245,.12);  color: #97a4ff; border: 1px solid rgba(91,110,245,.2); }
+    .chip-teal   { background: rgba(61,214,200,.1);   color: var(--accent3); border: 1px solid rgba(61,214,200,.2); }
+    .chip-red    { background: rgba(245,91,91,.1);    color: #ff9090; border: 1px solid rgba(245,91,91,.2); }
+    .chip-purple { background: rgba(143,87,251,.12);  color: #c9a0ff; border: 1px solid rgba(143,87,251,.25); }
 
     .listening-wave {
       display: none;
@@ -285,7 +286,6 @@
       50%      { transform: scaleY(.35); }
     }
 
-
     .transcript-box {
       margin-top: 16px;
       background: var(--surface);
@@ -298,7 +298,6 @@
       transition: border-color .3s;
     }
     .transcript-box.active { border-color: rgba(91,110,245,.4); color: var(--text); }
-
 
     .result-panel {
       margin-top: 32px;
@@ -337,9 +336,7 @@
       margin-top: 4px;
     }
 
-    .confidence-bar-wrap {
-      margin-top: 16px;
-    }
+    .confidence-bar-wrap { margin-top: 16px; }
     .confidence-bar-label {
       display: flex; justify-content: space-between;
       font-size: 12px; color: var(--muted); margin-bottom: 6px;
@@ -355,7 +352,6 @@
       transition: width .6s cubic-bezier(.2,.8,.4,1);
     }
 
-
     .video-wrap {
       margin-top: 20px;
       display: flex; flex-wrap: wrap; gap: 16px;
@@ -366,7 +362,6 @@
       max-width: 100%;
       box-shadow: 0 8px 32px rgba(0,0,0,.4);
     }
-
 
     .camera-preview-wrap {
       position: relative;
@@ -412,7 +407,6 @@
       from { top: 0; } to { top: 100%; }
     }
 
-
     .camera-preview-wrap::before,
     .camera-preview-wrap::after {
       content: '';
@@ -430,7 +424,6 @@
       bottom: 12px; right: 12px;
       border-width: 0 2px 2px 0;
     }
-
 
     .progress-ring-wrap {
       position: relative; display: none;
@@ -494,13 +487,11 @@
     }
     .section-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
 
-
     .divider {
       height: 1px;
       background: var(--border);
       margin: 48px 0;
     }
-
 
     footer {
       text-align: center;
@@ -510,7 +501,6 @@
       border-top: 1px solid var(--border);
     }
     footer span { color: var(--accent); }
-
 
     .toast {
       position: fixed; bottom: 28px; right: 28px;
@@ -528,7 +518,6 @@
     }
     .toast.show { opacity: 1; transform: translateY(0); }
 
-
     .spinner {
       display: none;
       width: 18px; height: 18px;
@@ -539,40 +528,183 @@
     }
     .spinner.active { display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ──────────────────────────────────────────
+       VIDEO UPLOAD SECTION  (new styles)
+    ────────────────────────────────────────── */
+
+    /* Full-width card for video upload */
+    .card-full {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      margin-top: 20px;
+      transition: border-color .25s, box-shadow .25s;
+    }
+    .card-full:hover { border-color: rgba(143,87,251,.3); box-shadow: 0 0 40px rgba(143,87,251,.08); }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed rgba(143,87,251,.35);
+      border-radius: var(--radius);
+      background: rgba(143,87,251,.04);
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .25s, background .25s;
+      position: relative;
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: rgba(143,87,251,.7);
+      background: rgba(143,87,251,.09);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+      width: 100%; height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      display: block;
+      filter: drop-shadow(0 0 12px rgba(143,87,251,.6));
+    }
+
+    .drop-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+    .drop-sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .drop-sub strong {
+      color: #c9a0ff;
+    }
+
+    /* Selected file info bar */
+    .file-info-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: rgba(143,87,251,.08);
+      border: 1px solid rgba(143,87,251,.2);
+      border-radius: 10px;
+    }
+    .file-info-bar.visible { display: flex; }
+    .file-info-icon { font-size: 22px; flex-shrink: 0; }
+    .file-info-name {
+      font-size: 13px; font-weight: 500;
+      color: var(--text);
+      flex: 1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .file-info-size {
+      font-size: 12px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .file-clear-btn {
+      background: none; border: none;
+      color: var(--muted); cursor: pointer;
+      font-size: 16px; line-height: 1;
+      padding: 2px 6px;
+      border-radius: 6px;
+      transition: color .2s, background .2s;
+    }
+    .file-clear-btn:hover { color: var(--danger); background: rgba(245,91,91,.1); }
+
+    /* Inline video preview */
+    .video-preview-wrap {
+      display: none;
+      margin-top: 16px;
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid rgba(143,87,251,.3);
+      background: var(--surface);
+    }
+    .video-preview-wrap.visible { display: block; }
+    .video-preview-wrap video {
+      width: 100%;
+      display: block;
+      border-radius: var(--radius);
+    }
+
+    /* Upload progress bar */
+    .upload-progress-wrap {
+      display: none;
+      margin-top: 16px;
+    }
+    .upload-progress-wrap.visible { display: block; }
+    .upload-progress-label {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .upload-progress-track {
+      height: 4px; border-radius: 4px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .upload-progress-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, #8f57fb, #c45ef5);
+      width: 0%;
+      transition: width .3s ease;
+    }
+
+    /* Video upload result block */
+    .video-upload-result {
+      margin-top: 20px;
+      padding: 24px;
+      background: rgba(143,87,251,.05);
+      border: 1px solid rgba(143,87,251,.2);
+      border-radius: var(--radius);
+      display: none;
+      animation: slideUp .4s cubic-bezier(.2,.8,.4,1);
+    }
+    .video-upload-result.visible { display: block; }
+    .video-upload-result .result-label-en {
+      background: linear-gradient(90deg, #fff, #c9a0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .video-upload-result .confidence-bar-fill {
+      background: linear-gradient(90deg, #8f57fb, #c45ef5);
+    }
   </style>
 </head>
 
 <body>
 <div class="page">
 
-  
   <header>
 
   <section class="hero">
-    <!-- <a href="/logout" style="background:#f44336; color:white; padding:8px 12px; border-radius:4px;float:right;margin-right: 20px; text-decoration:none; font-weight:bold;">
-      Logout
-    </a> -->
     <h1 class="hero-title">Real-time Sign Language Interpretation<br></h1>
-    <p class="hero-desc">HELLO, GOOD MORNING, GOOD AFTERNOON, GOOD EVENING, GOOD NIGHT, HOW ARE YOU, ALRIGHT, PLEASED, THANK YOU <p>
+    <p class="hero-desc">HELLO, GOOD MORNING, GOOD AFTERNOON, GOOD EVENING, GOOD NIGHT, HOW ARE YOU, ALRIGHT, PLEASED, THANK YOU</p>
   </section>
 
-  
   <div class="grid-2">
 
-    
+    <!-- Voice Input Card -->
     <div class="card">
       <div class="card-accent-bar"></div>
-   
       <h2 class="card-title">Voice Input</h2>
       <p class="card-desc">Speak a greeting in English or Bengali. The model will recognise the intent and show the ISL animation.</p>
 
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="startRecognition('en')">
-          English
-        </button>
-        <button class="btn btn-outline" onclick="startRecognition('bn')">
-          Bengali
-        </button>
+        <button class="btn btn-primary" onclick="startRecognition('en')"> English</button>
+        <button class="btn btn-outline" onclick="startRecognition('bn')"> Bengali</button>
       </div>
 
       <div style="display:flex;align-items:center;gap:12px;margin-top:16px;min-height:28px;">
@@ -585,21 +717,17 @@
       <div class="transcript-box" id="transcriptBox">Waiting for voice input…</div>
     </div>
 
-    
+    <!-- Live Gesture Card -->
     <div class="card">
       <div class="card-accent-bar teal"></div>
-      
       <h2 class="card-title">Live Gesture Input</h2>
       <p class="card-desc">Show your sign gesture on camera for 5 seconds. The model will classify it in real-time.</p>
 
       <div class="btn-row">
-        <button class="btn btn-teal" id="captureBtn" onclick="startCapture()">
-          Start Capture
-        </button>
+        <button class="btn btn-teal" id="captureBtn" onclick="startCapture()"> Start Capture</button>
         <div class="spinner" id="captureSpinner"></div>
       </div>
 
-      
       <div class="progress-ring-wrap" id="progressRing">
         <svg class="progress-ring-svg" width="56" height="56" viewBox="0 0 56 56">
           <circle cx="28" cy="28" r="22" stroke="rgba(255,255,255,.05)" fill="none" stroke-width="3"/>
@@ -621,7 +749,91 @@
     </div>
   </div>
 
- 
+  <!-- ══════════════════════════════════════════════════════════════
+       VIDEO UPLOAD CARD  (new full-width card)
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="card-full">
+    <div class="card-accent-bar purple"></div>
+
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+      <div class="card-icon purple"></div>
+      <div>
+        <h2 class="card-title" style="margin-bottom:2px;">Upload Sign Video</h2>
+        <p class="card-desc" style="margin-bottom:0;">Upload a pre-recorded video of a sign gesture. The model will extract frames and predict the sign.</p>
+      </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg,video/*" onchange="handleFileSelect(this.files[0])"/>
+      <span class="drop-icon"></span>
+      <div class="drop-title">Drop your video here or click to browse</div>
+      <div class="drop-sub">Accepts <strong>MP4, WebM, OGG</strong> · Max 100 MB · Any length</div>
+    </div>
+
+    <!-- Selected file info -->
+    <div class="file-info-bar" id="fileInfoBar">
+      <span class="file-info-icon"></span>
+      <span class="file-info-name" id="fileInfoName">—</span>
+      <span class="file-info-size" id="fileInfoSize">—</span>
+      <button class="file-clear-btn" onclick="clearVideoUpload()" title="Remove file">✕</button>
+    </div>
+
+    <!-- Inline preview of selected video -->
+    <div class="video-preview-wrap" id="uploadPreviewWrap">
+      <video id="uploadPreviewVideo" controls muted style="max-height:300px; object-fit:contain;"></video>
+    </div>
+
+    <!-- Upload progress -->
+    <div class="upload-progress-wrap" id="uploadProgressWrap">
+      <div class="upload-progress-label">
+        <span id="uploadProgressLabel">Uploading…</span>
+        <span id="uploadProgressPct">0%</span>
+      </div>
+      <div class="upload-progress-track">
+        <div class="upload-progress-fill" id="uploadProgressFill"></div>
+      </div>
+    </div>
+
+    <!-- Action button row -->
+    <div class="btn-row" style="margin-top:20px;">
+      <button class="btn btn-purple" id="uploadPredictBtn" onclick="uploadVideoAndPredict()" disabled>
+        <span id="uploadBtnIcon"></span>
+        <span id="uploadBtnText">Predict Sign</span>
+      </button>
+      <div class="spinner" id="uploadSpinner"></div>
+      <span id="uploadStatusText" style="font-size:13px;color:var(--muted);align-self:center;"></span>
+    </div>
+
+    <!-- Prediction result -->
+    <div class="video-upload-result" id="videoUploadResult">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div>
+          <div class="result-label-en" id="vuLabelEn">—</div>
+          <div class="result-label-bn" id="vuLabelBn"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span class="chip chip-purple" id="vuChip">Sign</span>
+          <button class="speak-btn" id="vuSpeakBtn" onclick="speakResult('vu')"> Speak</button>
+        </div>
+      </div>
+
+      <div class="confidence-bar-wrap" style="margin-top:16px;">
+        <div class="confidence-bar-label">
+          <span>Model Confidence</span>
+          <span id="vuConfVal">—</span>
+        </div>
+        <div class="confidence-bar-track">
+          <div class="confidence-bar-fill" id="vuConfBar" style="width:0%;background:linear-gradient(90deg,#8f57fb,#c45ef5)"></div>
+        </div>
+      </div>
+
+      <div class="video-wrap" id="vuVideos"></div>
+    </div>
+  </div>
+  <!-- end video upload card -->
+
+  <!-- Speech result panel -->
   <div class="result-panel" id="speechResult">
     <div class="card-accent-bar"></div>
     <div class="result-header">
@@ -631,9 +843,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="chip chip-blue" id="speechChip">Intent</span>
-        <button class="speak-btn" id="speechSpeakBtn" onclick="speakResult('speech')">
-          Speak
-        </button>
+        <button class="speak-btn" id="speechSpeakBtn" onclick="speakResult('speech')"> Speak</button>
       </div>
     </div>
     <div class="confidence-bar-wrap">
@@ -650,7 +860,7 @@
 
   <div class="divider"></div>
 
-  
+  <!-- Gesture Prediction Section -->
   <section>
     <h2 class="section-heading">Gesture Prediction</h2>
     <p class="section-sub">Output from the real-time sign recognition model</p>
@@ -663,9 +873,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span class="chip chip-teal" id="signChip">Sign</span>
-          <button class="speak-btn" id="signSpeakBtn" onclick="speakResult('sign')">
-            Speak
-          </button>
+          <button class="speak-btn" id="signSpeakBtn" onclick="speakResult('sign')"> Speak</button>
         </div>
       </div>
 
@@ -683,13 +891,12 @@
     </div>
   </section>
 
-  
   <footer>
     <p>Built with <span>CNN + BiLSTM</span> · mBERT · Flask · Web Speech API</p>
     <p style="margin-top:6px;">ISL Interpreter — Sign Language Recognition System</p>
   </footer>
 
-
+</div><!-- .page -->
 
 <div class="toast" id="toast">
   <span id="toastIcon"></span>
@@ -697,9 +904,11 @@
 </div>
 
 <script>
-
+/* ──────────────────────────────────────────
+   TOAST
+────────────────────────────────────────── */
 let toastTimer;
-function showToast(msg, icon='ℹ️') {
+function showToast(msg, icon='') {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent  = msg;
   document.getElementById('toastIcon').textContent = icon;
@@ -708,29 +917,27 @@ function showToast(msg, icon='ℹ️') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-
-let ttsData = {};   // stores {en, bn} per result source
+/* ──────────────────────────────────────────
+   TTS
+────────────────────────────────────────── */
+let ttsData = {};
 
 function speakResult(source) {
   const d = ttsData[source];
   if (!d) return;
-
   const btn = document.getElementById(source + 'SpeakBtn');
-
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(d.en);
   utter.lang  = 'en-US';
   utter.rate  = 0.9;
   utter.pitch = 1;
-
   btn.classList.add('speaking');
   utter.onend  = () => btn.classList.remove('speaking');
   utter.onerror= () => btn.classList.remove('speaking');
-
   window.speechSynthesis.speak(utter);
 }
 
-function autoSpeak(label, source) {
+function autoSpeak(label) {
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(label.replace(/_/g,' '));
   utter.lang  = 'en-US';
@@ -738,19 +945,20 @@ function autoSpeak(label, source) {
   window.speechSynthesis.speak(utter);
 }
 
-
+/* ──────────────────────────────────────────
+   SPEECH RECOGNITION
+────────────────────────────────────────── */
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognizer;
 
 function startRecognition(lang) {
   if (!SpeechRec) { showToast('Speech recognition not supported in this browser.', ''); return; }
-
   if (recognizer) { try { recognizer.stop(); } catch(_){} }
 
   recognizer = new SpeechRec();
-  recognizer.lang            = lang === 'bn' ? 'bn-BD' : 'en-US';
-  recognizer.continuous      = false;
-  recognizer.interimResults  = false;
+  recognizer.lang           = lang === 'bn' ? 'bn-BD' : 'en-US';
+  recognizer.continuous     = false;
+  recognizer.interimResults = false;
 
   const wave   = document.getElementById('speechWave');
   const status = document.getElementById('speechStatus');
@@ -760,7 +968,6 @@ function startRecognition(lang) {
   status.textContent = 'Listening…';
   box.textContent    = 'Listening…';
   box.classList.add('active');
-
   recognizer.start();
 
   recognizer.onresult = function(e) {
@@ -770,7 +977,6 @@ function startRecognition(lang) {
     wave.classList.remove('active');
     processSpeech(transcript, lang);
   };
-
   recognizer.onerror = function(e) {
     wave.classList.remove('active');
     status.textContent = '';
@@ -778,10 +984,7 @@ function startRecognition(lang) {
     box.classList.remove('active');
     showToast('Recognition error: ' + e.error, '');
   };
-
-  recognizer.onend = function() {
-    wave.classList.remove('active');
-  };
+  recognizer.onend = function() { wave.classList.remove('active'); };
 }
 
 function processSpeech(text, lang) {
@@ -795,11 +998,10 @@ function processSpeech(text, lang) {
     document.getElementById('speechStatus').textContent = '';
     if (data.error) { showToast(data.error, ''); return; }
 
-    // Fill result panel
     const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
     document.getElementById('speechLabelEn').textContent = enLabel;
     document.getElementById('speechLabelBn').textContent = data.bengali || '';
-    document.getElementById('speechChip').textContent   = data.predicted_label;
+    document.getElementById('speechChip').textContent    = data.predicted_label;
 
     const conf = Math.round((data.confidence || 0) * 100);
     document.getElementById('speechConfVal').textContent = conf + '%';
@@ -807,7 +1009,6 @@ function processSpeech(text, lang) {
 
     ttsData['speech'] = { en: enLabel, bn: data.bengali || '' };
 
-    // Videos
     const vWrap = document.getElementById('speechVideos');
     vWrap.innerHTML = '';
     (data.videos || []).forEach(src => {
@@ -816,52 +1017,44 @@ function processSpeech(text, lang) {
       v.style.maxWidth = '320px';
       const s = document.createElement('source');
       s.src = src; s.type = 'video/mp4';
-      v.appendChild(s);
-      vWrap.appendChild(v);
-
+      v.appendChild(s); vWrap.appendChild(v);
       let plays = 0;
-      v.addEventListener('ended', () => {
-        plays++;
-        if (plays < 2) { v.currentTime = 0; v.play(); }
-        else v.remove();
-      });
+      v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
     });
 
     document.getElementById('speechResult').classList.add('visible');
-    autoSpeak(enLabel, 'speech');
+    autoSpeak(enLabel);
     showToast('Intent detected: ' + enLabel, '');
   })
-  .catch(err => {
-    showToast('Server error. Check Flask is running.', '');
-    console.error(err);
-  });
+  .catch(err => { showToast('Server error. Check Flask is running.', ''); console.error(err); });
 }
 
+/* ──────────────────────────────────────────
+   LIVE CAMERA CAPTURE
+────────────────────────────────────────── */
 let mediaStream = null;
 const CAPTURE_DURATION_MS = 5000;
-const FRAME_INTERVAL_MS   = 150;   
+const FRAME_INTERVAL_MS   = 150;
 
 function setCaptureBtnState(running) {
   const btn = document.getElementById('captureBtn');
   const sp  = document.getElementById('captureSpinner');
-  btn.disabled = running;
+  btn.disabled    = running;
   btn.textContent = running ? 'Capturing…' : 'Start Capture';
   sp.classList.toggle('active', running);
 }
 
-
 async function startCapture() {
-
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showToast('Camera not supported or blocked. Use a modern browser with HTTPS.', '');
-    return;  // stop the function
+    return;
   }
   setCaptureBtnState(true);
-  const ringWrap = document.getElementById('progressRing');
-  const ringCircle = document.getElementById('ringCircle');
-  const ringText   = document.getElementById('ringText');
-  const cameraWrap = document.getElementById('cameraWrap');
-  const scanLine   = document.getElementById('scanLine');
+  const ringWrap         = document.getElementById('progressRing');
+  const ringCircle       = document.getElementById('ringCircle');
+  const ringText         = document.getElementById('ringText');
+  const cameraWrap       = document.getElementById('cameraWrap');
+  const scanLine         = document.getElementById('scanLine');
   const cameraStatusText = document.getElementById('cameraStatusText');
 
   try {
@@ -869,7 +1062,7 @@ async function startCapture() {
     const feed = document.getElementById('cameraFeed');
     feed.srcObject = mediaStream;
     cameraWrap.classList.add('active');
-    await new Promise(r => setTimeout(r, 600));  // camera warm-up
+    await new Promise(r => setTimeout(r, 600));
 
     scanLine.classList.add('active');
     ringWrap.classList.add('active');
@@ -882,28 +1075,24 @@ async function startCapture() {
     canvas.height = feed.videoHeight || 240;
     const ctx = canvas.getContext('2d');
 
-    const startTime = Date.now();
-    const circumference = 138; // 2π×22
+    const startTime   = Date.now();
+    const circumference = 138;
 
     while (Date.now() - startTime < CAPTURE_DURATION_MS) {
       ctx.drawImage(feed, 0, 0, canvas.width, canvas.height);
       frames.push(canvas.toDataURL('image/jpeg', 0.7));
-
       const elapsed = Date.now() - startTime;
       const pct     = elapsed / CAPTURE_DURATION_MS;
       ringCircle.style.strokeDashoffset = circumference * (1 - pct);
       ringText.textContent = Math.ceil((CAPTURE_DURATION_MS - elapsed) / 1000);
-
       await new Promise(r => setTimeout(r, FRAME_INTERVAL_MS));
     }
 
-    // clean UI
     ringCircle.style.strokeDashoffset = 0;
     ringText.textContent = '✓';
     cameraStatusText.textContent = 'Predicting…';
     showToast('Sending frames to model…', '');
 
-    // call backend
     const res  = await fetch('/predict_sign', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -932,29 +1121,278 @@ async function startCapture() {
       v.style.maxWidth = '320px';
       const s = document.createElement('source');
       s.src = src; s.type = 'video/mp4';
-      v.appendChild(s);
-      vWrap.appendChild(v);
+      v.appendChild(s); vWrap.appendChild(v);
       let plays = 0;
       v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
     });
 
     document.getElementById('signResult').classList.add('visible');
-    autoSpeak(enLabel, 'sign');
+    autoSpeak(enLabel);
     showToast('Sign recognised: ' + enLabel, '');
 
   } catch (err) {
     showToast('Camera error: ' + err.message, '');
     console.error(err);
   } finally {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(t => t.stop());
-      mediaStream = null;
-    }
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
     document.getElementById('cameraWrap').classList.remove('active');
     document.getElementById('scanLine').classList.remove('active');
     document.getElementById('progressRing').classList.remove('active');
     setCaptureBtnState(false);
   }
+}
+
+/* ──────────────────────────────────────────
+   VIDEO UPLOAD & PREDICT  (new section)
+────────────────────────────────────────── */
+let selectedVideoFile = null;
+
+// Drag-and-drop visual feedback
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFileSelect(file);
+});
+
+function formatBytes(bytes) {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function handleFileSelect(file) {
+  if (!file) return;
+
+  // Validate type
+  if (!file.type.startsWith('video/')) {
+    showToast('Please select a valid video file.', '');
+    return;
+  }
+  // Validate size (100 MB)
+  if (file.size > 100 * 1024 * 1024) {
+    showToast('File too large. Maximum size is 100 MB.', '');
+    return;
+  }
+
+  selectedVideoFile = file;
+
+  // Show info bar
+  document.getElementById('fileInfoName').textContent = file.name;
+  document.getElementById('fileInfoSize').textContent = formatBytes(file.size);
+  document.getElementById('fileInfoBar').classList.add('visible');
+
+  // Show inline preview
+  const previewWrap = document.getElementById('uploadPreviewWrap');
+  const previewVid  = document.getElementById('uploadPreviewVideo');
+  previewVid.src = URL.createObjectURL(file);
+  previewWrap.classList.add('visible');
+
+  // Enable predict button
+  document.getElementById('uploadPredictBtn').disabled = false;
+
+  // Hide any old result
+  document.getElementById('videoUploadResult').classList.remove('visible');
+  document.getElementById('uploadProgressWrap').classList.remove('visible');
+  document.getElementById('uploadStatusText').textContent = '';
+
+  showToast('Video ready: ' + file.name, '');
+}
+
+function clearVideoUpload() {
+  selectedVideoFile = null;
+
+  // Reset file input
+  const inp = document.getElementById('videoFileInput');
+  inp.value = '';
+
+  // Hide UI sections
+  document.getElementById('fileInfoBar').classList.remove('visible');
+  document.getElementById('uploadPreviewWrap').classList.remove('visible');
+  document.getElementById('videoUploadResult').classList.remove('visible');
+  document.getElementById('uploadProgressWrap').classList.remove('visible');
+  document.getElementById('uploadPredictBtn').disabled = true;
+  document.getElementById('uploadStatusText').textContent = '';
+
+  // Free object URL
+  const v = document.getElementById('uploadPreviewVideo');
+  if (v.src) { URL.revokeObjectURL(v.src); v.src = ''; }
+
+  showToast('Video cleared.', '');
+}
+
+async function uploadVideoAndPredict() {
+  if (!selectedVideoFile) { showToast('Please select a video first.', ''); return; }
+
+  const btn        = document.getElementById('uploadPredictBtn');
+  const spinner    = document.getElementById('uploadSpinner');
+  const statusText = document.getElementById('uploadStatusText');
+  const progWrap   = document.getElementById('uploadProgressWrap');
+  const progFill   = document.getElementById('uploadProgressFill');
+  const progLabel  = document.getElementById('uploadProgressLabel');
+  const progPct    = document.getElementById('uploadProgressPct');
+
+  btn.disabled = true;
+  spinner.classList.add('active');
+  document.getElementById('videoUploadResult').classList.remove('visible');
+
+  // ── Step 1: extract frames from the video in-browser ──────────
+  statusText.textContent = 'Extracting frames…';
+  progWrap.classList.add('visible');
+  progLabel.textContent = 'Extracting frames from video…';
+
+  let frames;
+  try {
+    frames = await extractFramesFromVideo(selectedVideoFile, (pct) => {
+      progFill.style.width = (pct * 60) + '%';   // 0–60% for extraction
+      progPct.textContent  = Math.round(pct * 60) + '%';
+    });
+  } catch(err) {
+    showToast('Frame extraction failed: ' + err.message, '❌');
+    btn.disabled = false; spinner.classList.remove('active');
+    statusText.textContent = '';
+    return;
+  }
+
+  if (frames.length < 5) {
+    showToast('Could not extract enough frames from the video.', '⚠️');
+    btn.disabled = false; spinner.classList.remove('active');
+    statusText.textContent = '';
+    return;
+  }
+
+  // ── Step 2: send to /predict_sign (same endpoint as live camera) ──
+  statusText.textContent = 'Sending to model…';
+  progLabel.textContent  = 'Running prediction…';
+  progFill.style.width   = '65%';
+  progPct.textContent    = '65%';
+  showToast('Analysing ' + frames.length + ' frames…', '');
+
+  try {
+    const res  = await fetch('/predict_sign', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ frames })
+    });
+    const data = await res.json();
+
+    progFill.style.width = '100%';
+    progPct.textContent  = '100%';
+    setTimeout(() => progWrap.classList.remove('visible'), 800);
+
+    if (data.error) { showToast(data.error, ''); return; }
+
+    // Populate result block
+    const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
+    document.getElementById('vuLabelEn').textContent = enLabel;
+    document.getElementById('vuLabelBn').textContent = data.bengali || '';
+    document.getElementById('vuChip').textContent    = data.predicted_label;
+
+    const conf = Math.round((data.confidence || 0) * 100);
+    document.getElementById('vuConfVal').textContent = conf + '%';
+    document.getElementById('vuConfBar').style.width = conf + '%';
+
+    ttsData['vu'] = { en: enLabel, bn: data.bengali || '' };
+
+    // Reference videos
+    const vWrap = document.getElementById('vuVideos');
+    vWrap.innerHTML = '';
+    (data.videos || []).forEach(src => {
+      const v = document.createElement('video');
+      v.controls = true; v.autoplay = true;
+      v.style.maxWidth = '320px';
+      const s = document.createElement('source');
+      s.src = src; s.type = 'video/mp4';
+      v.appendChild(s); vWrap.appendChild(v);
+      let plays = 0;
+      v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
+    });
+
+    document.getElementById('videoUploadResult').classList.add('visible');
+    autoSpeak(enLabel);
+    showToast('Sign recognised: ' + enLabel, '');
+    statusText.textContent = '';
+
+  } catch(err) {
+    showToast('Server error: ' + err.message, '');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('active');
+  }
+}
+
+/**
+ * Extract ~30 evenly-spaced JPEG frames from a video File object.
+ * Uses an offscreen <video> + <canvas>.  Pure browser, no server round-trip.
+ * @param {File} file
+ * @param {function} onProgress  — called with fraction 0..1
+ * @returns {Promise<string[]>}  array of base64 data-URLs
+ */
+function extractFramesFromVideo(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const TARGET_FRAMES = 30;
+
+    const video  = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
+    const objURL = URL.createObjectURL(file);
+
+    video.muted    = true;
+    video.preload  = 'auto';
+    video.src      = objURL;
+
+    video.addEventListener('error', () => {
+      URL.revokeObjectURL(objURL);
+      reject(new Error('Video could not be decoded.'));
+    });
+
+    video.addEventListener('loadedmetadata', async () => {
+      const duration = video.duration;
+      if (!isFinite(duration) || duration <= 0) {
+        URL.revokeObjectURL(objURL);
+        reject(new Error('Cannot determine video duration.'));
+        return;
+      }
+
+      canvas.width  = 320;
+      canvas.height = 240;
+
+      const frameCount = Math.min(TARGET_FRAMES, Math.floor(duration * 10));
+      const times = [];
+      for (let i = 0; i < frameCount; i++) {
+        times.push((i / (frameCount - 1 || 1)) * (duration - 0.05));
+      }
+
+      const frames = [];
+
+      const seekAndCapture = (timeList, idx) => {
+        if (idx >= timeList.length) {
+          URL.revokeObjectURL(objURL);
+          resolve(frames);
+          return;
+        }
+
+        video.currentTime = timeList[idx];
+
+        const onSeeked = () => {
+          video.removeEventListener('seeked', onSeeked);
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL('image/jpeg', 0.72));
+          } catch(_) {}
+          onProgress && onProgress((idx + 1) / timeList.length);
+          seekAndCapture(timeList, idx + 1);
+        };
+
+        video.addEventListener('seeked', onSeeked, { once: true });
+      };
+
+      seekAndCapture(times, 0);
+    });
+  });
 }
 </script>
 </body>
