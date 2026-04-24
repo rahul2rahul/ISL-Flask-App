@@ -5,15 +5,10 @@ gunicorn==22.0.0
 # ── TensorFlow CPU-only ───────────────────────────────────────────
 tensorflow-cpu==2.15.1
 
-# ── PyTorch CPU-only (for from_pt=True weight conversion only) ────
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-
 # ── HuggingFace ───────────────────────────────────────────────────
 transformers==4.40.2
 huggingface-hub==0.23.4
 tokenizers==0.19.1
-safetensors==0.4.3
 
 # ── Vision / array ────────────────────────────────────────────────
 opencv-python-headless==4.9.0.80
