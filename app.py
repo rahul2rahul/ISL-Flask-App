@@ -1,35 +1,52 @@
-import os
-import gc
-import sys
-import random
-import base64
-import cv2
-import json
-import logging
+"""
+app.py  —  ISL Greetings Flask App  (Render-ready, HuggingFace model download)
+================================================================================
+Models are stored in HuggingFace repo  rahul2025/isl
+and are downloaded ONCE at startup into /tmp (always writable on Render free tier).
+
+Dependencies (requirements.txt):
+    flask
+    tensorflow-cpu
+    transformers==4.40.2
+    tokenizers>=0.15,<0.20
+    opencv-python-headless
+    huggingface_hub
+    numpy
+    requests
+
+Zero torch.  Runs on Render free tier (512 MB RAM).
+"""
+
+import os, random, base64, cv2, json
 import numpy as np
-import requests
-import time
+
+# ── CRITICAL: set BEFORE any transformers import ─────────────────
+os.environ["USE_TF"]                            = "1"
+os.environ["USE_TORCH"]                         = "0"
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"]              = "2"
+
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 from flask import Flask, render_template, request, jsonify, url_for
 
-# ── ENV ──────────────────────────────────────────────────────────────
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["CUDA_VISIBLE_DEVICES"]  = ""
-
-HF_TOKEN    = os.environ.get("HUGGINGFACE_TOKEN")
-# Set this in Render environment variables — your HF Space URL
-HF_SPACE_URL = os.environ.get("HF_SPACE_URL", "https://rahul2025-isl-intent.hf.space")
-
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger(__name__)
+from transformers import BertTokenizerFast, TFBertForSequenceClassification
+from huggingface_hub import hf_hub_download, snapshot_download
 
 app = Flask(__name__)
 
-# ── LABEL MAPS ───────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════
+# 1.  LABEL MAPS
+# ═══════════════════════════════════════════════════════════════════
+LABEL2ID = {
+    "HELLO": 0, "GOOD_MORNING": 1, "GOOD_AFTERNOON": 2,
+    "GOOD_EVENING": 3, "GOOD_NIGHT": 4, "HOW_ARE_YOU": 5,
+    "ALRIGHT": 6, "PLEASED": 7, "THANK_YOU": 8,
+}
+ID2LABEL = {v: k for k, v in LABEL2ID.items()}
+
 LABEL_TO_BENGALI = {
     "HELLO":          "হ্যালো",
     "GOOD_MORNING":   "শুভ সকাল",
@@ -54,139 +71,173 @@ LABEL_TO_DISPLAY = {
     "THANK_YOU":      "Thank You",
 }
 
+# ═══════════════════════════════════════════════════════════════════
+# 2.  HUGGINGFACE REPO CONFIG
+# ═══════════════════════════════════════════════════════════════════
+HF_REPO_ID   = "rahul2025/isl"
+HF_TOKEN     = os.environ.get("HF_TOKEN")          # set in Render dashboard
 
-# ══════════════════════════════════════════════════════════════════════
-# INTENT — calls HF Space running mBERT (zero memory on Render)
-# ══════════════════════════════════════════════════════════════════════
-def predict_intent(text: str):
+# Local cache paths (writable on Render free tier)
+INTENT_LOCAL = "/tmp/isl_intent_model"
+SIGN_LOCAL   = "/tmp/isl_sign_model.keras"
+LMAP_LOCAL   = "/tmp/isl_label_map.json"
+
+# ═══════════════════════════════════════════════════════════════════
+# 3.  DOWNLOAD MODELS AT STARTUP
+# ═══════════════════════════════════════════════════════════════════
+def download_models():
     """
-    Sends text to the Gradio Space API which runs mBERT.
-    Gradio API endpoint: POST /api/predict  body: {"data": ["<text>"]}
-    Response: {"data": ["<json string>"]}
+    Download model files from HuggingFace into /tmp.
+    Skips files that already exist (container restarts are rare on Render
+    but this saves time during local dev restarts).
     """
-    api_url = f"{HF_SPACE_URL}/api/predict"
+    print("=== Checking / downloading models from HuggingFace ===")
 
-    for attempt in range(3):
-        try:
-            resp = requests.post(
-                api_url,
-                json    = {"data": [text]},
-                timeout = 40,
-            )
-            log.info(f"Space intent API [{attempt+1}] status: {resp.status_code}")
+    # ── 3a. Intent model (whole folder) ──────────────────────────
+    # snapshot_download fetches all files in final_model/ subfolder.
+    # They land at  /tmp/isl_intent_model/  preserving sub-paths.
+    if not os.path.isdir(INTENT_LOCAL) or not os.listdir(INTENT_LOCAL):
+        print("  Downloading intent model (mBERT)…")
+        os.makedirs(INTENT_LOCAL, exist_ok=True)
+        snapshot_download(
+            repo_id        = HF_REPO_ID,
+            token          = HF_TOKEN,
+            allow_patterns = ["final_model/*"],
+            local_dir      = "/tmp/hf_cache_isl",
+        )
+        # snapshot_download puts files under  /tmp/hf_cache_isl/final_model/
+        # Move them up one level so INTENT_LOCAL is the model root.
+        import shutil
+        src = "/tmp/hf_cache_isl/final_model"
+        if os.path.isdir(src):
+            shutil.copytree(src, INTENT_LOCAL, dirs_exist_ok=True)
+        print(f"  Intent model ready at {INTENT_LOCAL}")
+    else:
+        print(f"  Intent model already at {INTENT_LOCAL}, skipping download.")
 
-            # Space is waking up (cold start)
-            if resp.status_code in (503, 502):
-                log.info("Space cold-starting, waiting 20s...")
-                time.sleep(20)
-                continue
+    # ── 3b. Sign model (.keras) ───────────────────────────────────
+    if not os.path.isfile(SIGN_LOCAL):
+        print("  Downloading sign model (CNN+BiLSTM)…")
+        path = hf_hub_download(
+            repo_id   = HF_REPO_ID,
+            filename  = "model/model_cnn_bilstm.keras",
+            token     = HF_TOKEN,
+            local_dir = "/tmp",
+        )
+        # hf_hub_download returns the actual path; rename to our constant
+        os.makedirs(os.path.dirname(SIGN_LOCAL) or ".", exist_ok=True)
+        if path != SIGN_LOCAL:
+            import shutil
+            shutil.copy(path, SIGN_LOCAL)
+        print(f"  Sign model ready at {SIGN_LOCAL}")
+    else:
+        print(f"  Sign model already at {SIGN_LOCAL}, skipping download.")
 
-            if resp.status_code != 200:
-                log.error(f"Space API error: {resp.text[:300]}")
-                return "ERROR", 0.0
+    # ── 3c. Label map ─────────────────────────────────────────────
+    if not os.path.isfile(LMAP_LOCAL):
+        print("  Downloading label_map.json…")
+        path = hf_hub_download(
+            repo_id   = HF_REPO_ID,
+            filename  = "model/label_map.json",
+            token     = HF_TOKEN,
+            local_dir = "/tmp",
+        )
+        if path != LMAP_LOCAL:
+            import shutil
+            shutil.copy(path, LMAP_LOCAL)
+        print(f"  Label map ready at {LMAP_LOCAL}")
+    else:
+        print(f"  Label map already at {LMAP_LOCAL}, skipping download.")
 
-            result  = resp.json()
-            raw     = result.get("data", [None])[0]
-            if not raw:
-                return "UNKNOWN", 0.0
-
-            parsed  = json.loads(raw)
-            label   = parsed.get("label",      "UNKNOWN")
-            conf    = parsed.get("confidence", 0.0)
-            log.info(f"Intent result: {label} ({conf})")
-            return label, float(conf)
-
-        except requests.exceptions.Timeout:
-            log.warning(f"Space API timeout (attempt {attempt+1})")
-            time.sleep(5)
-        except Exception as e:
-            log.error(f"Space API exception: {e}")
-            time.sleep(5)
-
-    return "ERROR", 0.0
+    print("=== All models ready ===")
 
 
-# ══════════════════════════════════════════════════════════════════════
-# SIGN MODEL — lazy-loaded from HF Hub (Keras CNN+BiLSTM, TF only)
-# ══════════════════════════════════════════════════════════════════════
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-from huggingface_hub import hf_hub_download
+download_models()
 
-_sign_model  = None
-_label_map   = None
+# ═══════════════════════════════════════════════════════════════════
+# 4.  LOAD mBERT INTENT MODEL  (TF — no torch)
+# ═══════════════════════════════════════════════════════════════════
+print("Loading mBERT tokenizer and classifier…")
+tokenizer    = BertTokenizerFast.from_pretrained(INTENT_LOCAL)
+intent_model = TFBertForSequenceClassification.from_pretrained(
+    INTENT_LOCAL,
+    num_labels = len(LABEL2ID),
+    id2label   = ID2LABEL,
+    label2id   = LABEL2ID,
+)
+print("mBERT loaded.")
+
+# ═══════════════════════════════════════════════════════════════════
+# 5.  LOAD SIGN MODEL  (CNN+BiLSTM Keras)
+# ═══════════════════════════════════════════════════════════════════
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
-HF_REPO_ID   = "rahul2025/isl"
 
+print("Loading CNN+BiLSTM sign model…")
+sign_model = load_model(SIGN_LOCAL)
+print("Sign model loaded.")
 
-def get_sign_model():
-    global _sign_model, _label_map
+with open(LMAP_LOCAL, encoding="utf-8") as f:
+    label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
 
-    if _sign_model is None:
-        log.info("Downloading sign model from HF Hub...")
-        model_path  = hf_hub_download(
-            repo_id  = HF_REPO_ID,
-            filename = "model_cnn_bilstm.keras",
-            token    = HF_TOKEN,
-        )
-        _sign_model = load_model(model_path, compile=False)
-        gc.collect()
-        log.info("Sign model loaded.")
+# ═══════════════════════════════════════════════════════════════════
+# 6.  INTENT PREDICTION  — mBERT, pure TF, zero torch
+# ═══════════════════════════════════════════════════════════════════
+def predict_intent(text: str):
+    encoded = tokenizer(
+        text,
+        return_tensors = "tf",
+        truncation     = True,
+        padding        = True,
+        max_length     = 32,
+    )
+    outputs = intent_model(**encoded, training=False)
+    probs   = tf.nn.softmax(outputs.logits, axis=-1)
+    idx     = int(tf.argmax(probs, axis=-1).numpy()[0])
+    conf    = float(probs.numpy()[0][idx])
+    label   = ID2LABEL.get(idx, "UNKNOWN")
+    return label, round(conf, 4)
 
-    if _label_map is None:
-        label_path = hf_hub_download(
-            repo_id  = HF_REPO_ID,
-            filename = "label_map.json",
-            token    = HF_TOKEN,
-        )
-        with open(label_path, encoding="utf-8") as f:
-            _label_map = json.load(f)
-        log.info("Label map loaded.")
-
-    return _sign_model, _label_map
-
-
-# ── Frame helpers ─────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════
+# 7.  SIGN PREDICTION HELPERS
+# ═══════════════════════════════════════════════════════════════════
 def decode_frames(frame_b64_list):
     frames = []
     for b64 in frame_b64_list:
         if "," in b64:
             b64 = b64.split(",", 1)[1]
-        try:
-            arr   = np.frombuffer(base64.b64decode(b64), np.uint8)
-            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if frame is not None:
-                frames.append(frame)
-        except Exception as e:
-            log.warning(f"Frame decode error: {e}")
+        img_bytes = base64.b64decode(b64)
+        arr       = np.frombuffer(img_bytes, np.uint8)
+        frame     = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is not None:
+            frames.append(frame)
     return frames
 
-
 def frames_to_clip(frames):
-    indices = np.linspace(0, len(frames) - 1, SEQ_LEN_SIGN, dtype=int)
+    n       = len(frames)
+    indices = np.linspace(0, n - 1, SEQ_LEN_SIGN, dtype=int)
     clip    = []
     for i in indices:
         rgb     = cv2.cvtColor(frames[i], cv2.COLOR_BGR2RGB)
         resized = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
         clip.append(resized.astype("float32"))
-    clip = preprocess_input(np.array(clip))   # MobileNetV2 normalise
-    return clip[np.newaxis, ...]               # (1, 15, 96, 96, 3)
-
+    clip = np.array(clip)
+    clip = preprocess_input(clip)
+    return clip[np.newaxis, ...]
 
 def get_video_for_label(label):
-    folder = os.path.join(app.static_folder, "videos", label)
-    if os.path.exists(folder):
-        files = [f for f in os.listdir(folder) if f.endswith(".mp4")]
+    videos       = []
+    video_folder = os.path.join(app.static_folder, "videos", label)
+    if os.path.exists(video_folder):
+        files = [f for f in os.listdir(video_folder) if f.endswith(".mp4")]
         if files:
-            return [url_for("static", filename=f"videos/{label}/{random.choice(files)}")]
-    return []
+            selected = random.choice(files)
+            videos.append(url_for("static", filename=f"videos/{label}/{selected}"))
+    return videos
 
-
-# ══════════════════════════════════════════════════════════════════════
-# ROUTES
-# ══════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+# 8.  ROUTES
+# ═══════════════════════════════════════════════════════════════════
 @app.route("/")
 def home():
     return render_template("home.html")
@@ -194,51 +245,52 @@ def home():
 
 @app.route("/process_speech", methods=["POST"])
 def process_speech():
-    data = request.get_json() or {}
+    data = request.get_json()
     text = data.get("text", "").strip()
-
     if not text:
         return jsonify({"error": "No input text"}), 400
 
-    label, conf = predict_intent(text)
+    intent_label, confidence = predict_intent(text)
 
     return jsonify({
         "input_text":      text,
-        "predicted_label": label,
-        "display_name":    LABEL_TO_DISPLAY.get(label, label),
-        "bengali":         LABEL_TO_BENGALI.get(label, ""),
-        "confidence":      conf,
-        "videos":          get_video_for_label(label),
+        "predicted_label": intent_label,
+        "display_name":    LABEL_TO_DISPLAY.get(intent_label, intent_label),
+        "bengali":         LABEL_TO_BENGALI.get(intent_label, ""),
+        "confidence":      confidence,
+        "videos":          get_video_for_label(intent_label),
     })
 
 
 @app.route("/predict_sign", methods=["POST"])
 def predict_sign():
-    data   = request.get_json() or {}
-    frames = decode_frames(data.get("frames", []))
+    data       = request.get_json()
+    frame_list = data.get("frames", [])
+    if not frame_list:
+        return jsonify({"error": "No frames received"}), 400
 
+    frames = decode_frames(frame_list)
     if len(frames) < 5:
-        return jsonify({"error": "Too few frames received"}), 400
+        return jsonify({"error": "Too few valid frames captured"}), 400
 
-    model, label_map = get_sign_model()
-    clip             = frames_to_clip(frames)
-    preds            = model.predict(clip, verbose=0)
-    idx              = int(np.argmax(preds[0]))
-    conf             = float(np.max(preds[0]))
-    label            = label_map.get(str(idx), "UNKNOWN")
+    clip            = frames_to_clip(frames)
+    preds           = sign_model.predict(clip, verbose=0)
+    class_idx       = int(np.argmax(preds[0]))
+    confidence      = float(np.max(preds[0]))
+    predicted_label = label_map.get(str(class_idx), "UNKNOWN")
 
     return jsonify({
-        "predicted_label": label,
-        "display_name":    LABEL_TO_DISPLAY.get(label, label),
-        "bengali":         LABEL_TO_BENGALI.get(label, ""),
-        "confidence":      round(conf, 4),
-        "videos":          get_video_for_label(label),
+        "predicted_label": predicted_label,
+        "display_name":    LABEL_TO_DISPLAY.get(predicted_label, predicted_label),
+        "bengali":         LABEL_TO_BENGALI.get(predicted_label, ""),
+        "confidence":      round(confidence, 4),
+        "videos":          get_video_for_label(predicted_label),
     })
 
 
-# ══════════════════════════════════════════════════════════════════════
-# ENTRY
-# ══════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+# 9.  ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
