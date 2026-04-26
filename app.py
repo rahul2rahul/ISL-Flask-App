@@ -318,7 +318,7 @@ def process_speech():
         "display_name":    LABEL_TO_DISPLAY.get(intent_label, intent_label),
         "bengali":         LABEL_TO_BENGALI.get(intent_label, ""),
         "confidence":      confidence,
-        "videos":          get_video_for_label(intent_label),
+        "videos": get_videos_for_label(intent_label),
     })
 
 
@@ -341,7 +341,7 @@ def predict_sign():
         "display_name":    LABEL_TO_DISPLAY.get(predicted_label, predicted_label),
         "bengali":         LABEL_TO_BENGALI.get(predicted_label, ""),
         "confidence":      round(confidence, 4),
-        "videos":          get_video_for_label(predicted_label),
+        "videos": get_videos_for_label(predicted_label),
     })
 
 
