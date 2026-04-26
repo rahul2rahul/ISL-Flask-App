@@ -283,9 +283,10 @@ def get_videos_for_label(label):
         print("❌ static/videos folder not found")
         return videos
 
+    label_clean = label.lower().replace("_", " ")
+
     for folder in os.listdir(base_root):
-        # match label with folder name (case-insensitive)
-        if folder.lower() == label.lower():
+        if folder.lower() == label_clean:
             folder_path = os.path.join(base_root, folder)
 
             for file in os.listdir(folder_path):
