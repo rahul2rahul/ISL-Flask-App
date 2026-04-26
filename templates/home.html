@@ -1271,7 +1271,7 @@ function clearVideoUpload() {
 }
 
 async function uploadVideoAndPredict() {
-  if (!selectedVideoFile) { showToast('Please select a video first.', '⚠️'); return; }
+  if (!selectedVideoFile) { showToast('Please select a video first.', ''); return; }
 
   const btn        = document.getElementById('uploadPredictBtn');
   const spinner    = document.getElementById('uploadSpinner');
@@ -1297,14 +1297,14 @@ async function uploadVideoAndPredict() {
       progPct.textContent  = Math.round(pct * 60) + '%';
     });
   } catch(err) {
-    showToast('Frame extraction failed: ' + err.message, '❌');
+    showToast('Frame extraction failed: ' + err.message, '');
     btn.disabled = false; spinner.classList.remove('active');
     statusText.textContent = '';
     return;
   }
 
   if (frames.length < 5) {
-    showToast('Could not extract enough frames from the video.', '⚠️');
+    showToast('Could not extract enough frames from the video.', '');
     btn.disabled = false; spinner.classList.remove('active');
     statusText.textContent = '';
     return;
@@ -1315,7 +1315,7 @@ async function uploadVideoAndPredict() {
   progLabel.textContent  = 'Running prediction…';
   progFill.style.width   = '65%';
   progPct.textContent    = '65%';
-  showToast('Analysing ' + frames.length + ' frames…', '⏳');
+  showToast('Analysing ' + frames.length + ' frames…', '');
 
   try {
     const res  = await fetch('/predict_sign', {
@@ -1329,7 +1329,7 @@ async function uploadVideoAndPredict() {
     progPct.textContent  = '100%';
     setTimeout(() => progWrap.classList.remove('visible'), 800);
 
-    if (data.error) { showToast(data.error, '❌'); return; }
+    if (data.error) { showToast(data.error, ''); return; }
 
     // Populate result block
     const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
@@ -1346,17 +1346,30 @@ async function uploadVideoAndPredict() {
     // Reference videos
     const vWrap = document.getElementById('vuVideos');
     vWrap.innerHTML = '';
-    (data.videos || []).forEach(src => {
-      const v = document.createElement('video');
-      v.controls = true; v.autoplay = true;
-      v.style.maxWidth = '320px';
-      const s = document.createElement('source');
-      s.src = src; s.type = 'video/mp4';
-      v.appendChild(s); 
-      //vWrap.appendChild(v);
-      let plays = 0;
-      v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
-    });
+(data.videos || []).forEach(src => {
+  const v = document.createElement('video');
+  v.controls = true;
+  v.autoplay = true;
+  v.style.maxWidth = '320px';
+
+  const s = document.createElement('source');
+  s.src = src;
+  s.type = 'video/mp4';
+
+  v.appendChild(s);
+  vWrap.appendChild(v); // ✅ FIXED
+
+  let plays = 0;
+  v.addEventListener('ended', () => {
+    plays++;
+    if (plays < 2) {
+      v.currentTime = 0;
+      v.play();
+    } else {
+      v.remove();
+    }
+  });
+});
 
     document.getElementById('videoUploadResult').classList.add('visible');
     autoSpeak(enLabel);
