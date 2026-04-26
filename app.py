@@ -272,30 +272,29 @@ def frames_to_clip(frames):
     return clip[np.newaxis, ...]
 
 
-def get_video_for_label(label):
+import os
+from flask import url_for
+
+def get_videos_for_label(label):
+    base_root = os.path.join("static", "videos")
     videos = []
 
-    # 🔥 convert label to match folder naming
-    folder_name = label.lower().replace("_", " ")
+    if not os.path.exists(base_root):
+        print("❌ static/videos folder not found")
+        return videos
 
-    video_folder = os.path.join(app.static_folder, "videos", folder_name)
+    for folder in os.listdir(base_root):
+        # match label with folder name (case-insensitive)
+        if folder.lower() == label.lower():
+            folder_path = os.path.join(base_root, folder)
 
-    if not os.path.exists(video_folder):
-        print(f"[WARN] Folder not found: {video_folder}")
-        return []
+            for file in os.listdir(folder_path):
+                if file.endswith(".mp4"):
+                    videos.append(
+                        url_for('static', filename=f'videos/{folder}/{file}')
+                    )
 
-    files = [f for f in os.listdir(video_folder) if f.lower().endswith(".mp4")]
-
-    if not files:
-        print(f"[WARN] No videos in: {video_folder}")
-        return []
-
-    selected = random.choice(files)
-
-    video_url = url_for("static", filename=f"videos/{folder_name}/{selected}")
-    print(f"[OK] Video served: {video_url}")
-
-    videos.append(video_url)
+    print("VIDEOS FOUND:", videos)
     return videos
 
 # ═══════════════════════════════════════════════════════════════════
