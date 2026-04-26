@@ -681,6 +681,56 @@
     .video-upload-result .confidence-bar-fill {
       background: linear-gradient(90deg, #8f57fb, #c45ef5);
     }
+    .modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+}
+
+.modal.active {
+  display: block;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(6px);
+}
+
+.modal-content {
+  position: relative;
+  width: min(90%, 600px);
+  margin: 80px auto;
+  background: #080e31;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  animation: modalIn .3s ease;
+}
+
+@keyframes modalIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+#modalVideoContainer video {
+  width: 100%;
+  border-radius: 12px;
+}
   </style>
 </head>
 
@@ -703,8 +753,8 @@
       <p class="card-desc">Speak a greeting in English or Bengali. The model will recognise the intent and show the ISL animation.</p>
 
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="startRecognition('en')"> English</button>
-        <button class="btn btn-outline" onclick="startRecognition('bn')"> Bengali</button>
+        <button class="btn btn-primary" onclick="startRecognition('en')">🎤 English</button>
+        <button class="btn btn-outline" onclick="startRecognition('bn')">🎤 Bengali</button>
       </div>
 
       <div style="display:flex;align-items:center;gap:12px;margin-top:16px;min-height:28px;">
@@ -724,7 +774,7 @@
       <p class="card-desc">Show your sign gesture on camera for 5 seconds. The model will classify it in real-time.</p>
 
       <div class="btn-row">
-        <button class="btn btn-teal" id="captureBtn" onclick="startCapture()"> Start Capture</button>
+        <button class="btn btn-teal" id="captureBtn" onclick="startCapture()">▶ Start Capture</button>
         <div class="spinner" id="captureSpinner"></div>
       </div>
 
@@ -756,7 +806,7 @@
     <div class="card-accent-bar purple"></div>
 
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
-      <div class="card-icon purple"></div>
+      <div class="card-icon purple">🎬</div>
       <div>
         <h2 class="card-title" style="margin-bottom:2px;">Upload Sign Video</h2>
         <p class="card-desc" style="margin-bottom:0;">Upload a pre-recorded video of a sign gesture. The model will extract frames and predict the sign.</p>
@@ -766,14 +816,14 @@
     <!-- Drop zone -->
     <div class="drop-zone" id="dropZone">
       <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg,video/*" onchange="handleFileSelect(this.files[0])"/>
-      <span class="drop-icon"></span>
+      <span class="drop-icon">📁</span>
       <div class="drop-title">Drop your video here or click to browse</div>
       <div class="drop-sub">Accepts <strong>MP4, WebM, OGG</strong> · Max 100 MB · Any length</div>
     </div>
 
     <!-- Selected file info -->
     <div class="file-info-bar" id="fileInfoBar">
-      <span class="file-info-icon"></span>
+      <span class="file-info-icon">🎥</span>
       <span class="file-info-name" id="fileInfoName">—</span>
       <span class="file-info-size" id="fileInfoSize">—</span>
       <button class="file-clear-btn" onclick="clearVideoUpload()" title="Remove file">✕</button>
@@ -798,7 +848,7 @@
     <!-- Action button row -->
     <div class="btn-row" style="margin-top:20px;">
       <button class="btn btn-purple" id="uploadPredictBtn" onclick="uploadVideoAndPredict()" disabled>
-        <span id="uploadBtnIcon"></span>
+        <span id="uploadBtnIcon">🔍</span>
         <span id="uploadBtnText">Predict Sign</span>
       </button>
       <div class="spinner" id="uploadSpinner"></div>
@@ -814,7 +864,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span class="chip chip-purple" id="vuChip">Sign</span>
-          <button class="speak-btn" id="vuSpeakBtn" onclick="speakResult('vu')"> Speak</button>
+          <button class="speak-btn" id="vuSpeakBtn" onclick="speakResult('vu')">🔊 Speak</button>
         </div>
       </div>
 
@@ -843,7 +893,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span class="chip chip-blue" id="speechChip">Intent</span>
-        <button class="speak-btn" id="speechSpeakBtn" onclick="speakResult('speech')"> Speak</button>
+        <button class="speak-btn" id="speechSpeakBtn" onclick="speakResult('speech')">🔊 Speak</button>
       </div>
     </div>
     <div class="confidence-bar-wrap">
@@ -873,7 +923,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span class="chip chip-teal" id="signChip">Sign</span>
-          <button class="speak-btn" id="signSpeakBtn" onclick="speakResult('sign')"> Speak</button>
+          <button class="speak-btn" id="signSpeakBtn" onclick="speakResult('sign')">🔊 Speak</button>
         </div>
       </div>
 
@@ -908,7 +958,7 @@
    TOAST
 ────────────────────────────────────────── */
 let toastTimer;
-function showToast(msg, icon='') {
+function showToast(msg, icon='ℹ️') {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent  = msg;
   document.getElementById('toastIcon').textContent = icon;
@@ -952,7 +1002,7 @@ const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognizer;
 
 function startRecognition(lang) {
-  if (!SpeechRec) { showToast('Speech recognition not supported in this browser.', ''); return; }
+  if (!SpeechRec) { showToast('Speech recognition not supported in this browser.', '⚠️'); return; }
   if (recognizer) { try { recognizer.stop(); } catch(_){} }
 
   recognizer = new SpeechRec();
@@ -982,7 +1032,7 @@ function startRecognition(lang) {
     status.textContent = '';
     box.textContent = 'Error: ' + e.error + '. Please try again.';
     box.classList.remove('active');
-    showToast('Recognition error: ' + e.error, '');
+    showToast('Recognition error: ' + e.error, '⚠️');
   };
   recognizer.onend = function() { wave.classList.remove('active'); };
 }
@@ -996,7 +1046,7 @@ function processSpeech(text, lang) {
   .then(r => r.json())
   .then(data => {
     document.getElementById('speechStatus').textContent = '';
-    if (data.error) { showToast(data.error, ''); return; }
+    if (data.error) { showToast(data.error, '❌'); return; }
 
     const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
     document.getElementById('speechLabelEn').textContent = enLabel;
@@ -1011,22 +1061,19 @@ function processSpeech(text, lang) {
 
     const vWrap = document.getElementById('speechVideos');
     vWrap.innerHTML = '';
-    (data.videos || []).forEach(src => {
-      const v = document.createElement('video');
-      v.controls = true; v.autoplay = true;
-      v.style.maxWidth = '320px';
-      const s = document.createElement('source');
-      s.src = src; s.type = 'video/mp4';
-      v.appendChild(s); vWrap.appendChild(v);
-      let plays = 0;
-      v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
-    });
+console.log("VIDEOS:", data.videos);
+
+if (data.videos && data.videos.length > 0) {
+  openModalWithVideos(data.videos);
+} else {
+  console.warn("No videos received");
+}
 
     document.getElementById('speechResult').classList.add('visible');
     autoSpeak(enLabel);
     showToast('Intent detected: ' + enLabel, '');
   })
-  .catch(err => { showToast('Server error. Check Flask is running.', ''); console.error(err); });
+  .catch(err => { showToast('Server error. Check Flask is running.', '❌'); console.error(err); });
 }
 
 /* ──────────────────────────────────────────
@@ -1040,13 +1087,13 @@ function setCaptureBtnState(running) {
   const btn = document.getElementById('captureBtn');
   const sp  = document.getElementById('captureSpinner');
   btn.disabled    = running;
-  btn.textContent = running ? 'Capturing…' : 'Start Capture';
+  btn.textContent = running ? 'Capturing…' : '▶ Start Capture';
   sp.classList.toggle('active', running);
 }
 
 async function startCapture() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showToast('Camera not supported or blocked. Use a modern browser with HTTPS.', '');
+    showToast('Camera not supported or blocked. Use a modern browser with HTTPS.', '⚠️');
     return;
   }
   setCaptureBtnState(true);
@@ -1067,7 +1114,7 @@ async function startCapture() {
     scanLine.classList.add('active');
     ringWrap.classList.add('active');
     cameraStatusText.textContent = 'Capturing…';
-    showToast('Recording gesture for 5 seconds…', '');
+    showToast('Recording gesture for 5 seconds…', '🎥');
 
     const frames = [];
     const canvas = document.createElement('canvas');
@@ -1091,7 +1138,7 @@ async function startCapture() {
     ringCircle.style.strokeDashoffset = 0;
     ringText.textContent = '✓';
     cameraStatusText.textContent = 'Predicting…';
-    showToast('Sending frames to model…', '');
+    showToast('Sending frames to model…', '⏳');
 
     const res  = await fetch('/predict_sign', {
       method: 'POST',
@@ -1100,7 +1147,7 @@ async function startCapture() {
     });
     const data = await res.json();
 
-    if (data.error) { showToast(data.error, ''); return; }
+    if (data.error) { showToast(data.error, '❌'); return; }
 
     const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
     document.getElementById('signLabelEn').textContent = enLabel;
@@ -1128,10 +1175,10 @@ async function startCapture() {
 
     document.getElementById('signResult').classList.add('visible');
     autoSpeak(enLabel);
-    showToast('Sign recognised: ' + enLabel, '');
+    showToast('Sign recognised: ' + enLabel, '✅');
 
   } catch (err) {
-    showToast('Camera error: ' + err.message, '');
+    showToast('Camera error: ' + err.message, '❌');
     console.error(err);
   } finally {
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
@@ -1168,12 +1215,12 @@ function handleFileSelect(file) {
 
   // Validate type
   if (!file.type.startsWith('video/')) {
-    showToast('Please select a valid video file.', '');
+    showToast('Please select a valid video file.', '⚠️');
     return;
   }
   // Validate size (100 MB)
   if (file.size > 100 * 1024 * 1024) {
-    showToast('File too large. Maximum size is 100 MB.', '');
+    showToast('File too large. Maximum size is 100 MB.', '⚠️');
     return;
   }
 
@@ -1198,7 +1245,7 @@ function handleFileSelect(file) {
   document.getElementById('uploadProgressWrap').classList.remove('visible');
   document.getElementById('uploadStatusText').textContent = '';
 
-  showToast('Video ready: ' + file.name, '');
+  showToast('Video ready: ' + file.name, '✅');
 }
 
 function clearVideoUpload() {
@@ -1220,11 +1267,11 @@ function clearVideoUpload() {
   const v = document.getElementById('uploadPreviewVideo');
   if (v.src) { URL.revokeObjectURL(v.src); v.src = ''; }
 
-  showToast('Video cleared.', '');
+  showToast('Video cleared.', '🗑️');
 }
 
 async function uploadVideoAndPredict() {
-  if (!selectedVideoFile) { showToast('Please select a video first.', ''); return; }
+  if (!selectedVideoFile) { showToast('Please select a video first.', '⚠️'); return; }
 
   const btn        = document.getElementById('uploadPredictBtn');
   const spinner    = document.getElementById('uploadSpinner');
@@ -1268,7 +1315,7 @@ async function uploadVideoAndPredict() {
   progLabel.textContent  = 'Running prediction…';
   progFill.style.width   = '65%';
   progPct.textContent    = '65%';
-  showToast('Analysing ' + frames.length + ' frames…', '');
+  showToast('Analysing ' + frames.length + ' frames…', '⏳');
 
   try {
     const res  = await fetch('/predict_sign', {
@@ -1282,7 +1329,7 @@ async function uploadVideoAndPredict() {
     progPct.textContent  = '100%';
     setTimeout(() => progWrap.classList.remove('visible'), 800);
 
-    if (data.error) { showToast(data.error, ''); return; }
+    if (data.error) { showToast(data.error, '❌'); return; }
 
     // Populate result block
     const enLabel = (data.display_name || data.predicted_label || '').replace(/_/g, ' ');
@@ -1305,7 +1352,8 @@ async function uploadVideoAndPredict() {
       v.style.maxWidth = '320px';
       const s = document.createElement('source');
       s.src = src; s.type = 'video/mp4';
-      v.appendChild(s); vWrap.appendChild(v);
+      v.appendChild(s); 
+      //vWrap.appendChild(v);
       let plays = 0;
       v.addEventListener('ended', () => { plays++; if (plays < 2) { v.currentTime=0; v.play(); } else v.remove(); });
     });
@@ -1394,6 +1442,53 @@ function extractFramesFromVideo(file, onProgress) {
     });
   });
 }
+
+function openModalWithVideos(videoList) {
+  const modal = document.getElementById('videoModal');
+  const container = document.getElementById('modalVideoContainer');
+
+  container.innerHTML = '';
+
+  videoList.forEach(src => {
+    const v = document.createElement('video');
+    v.controls = true;
+    v.autoplay = true;
+    v.muted = true;
+    v.playsInline = true;
+
+    const s = document.createElement('source');
+    s.src = src;
+    s.type = 'video/mp4';
+
+    v.appendChild(s);
+    container.appendChild(v);
+  });
+
+  modal.classList.add('active');
+}
+
+function closeModal() {
+  const modal = document.getElementById('videoModal');
+  const container = document.getElementById('modalVideoContainer');
+
+  // stop videos
+  container.querySelectorAll('video').forEach(v => {
+    v.pause();
+    v.src = '';
+  });
+
+  modal.classList.remove('active');
+}
 </script>
+
+<div class="modal" id="videoModal">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
+
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <div id="modalVideoContainer"></div>
+  </div>
+</div>
 </body>
 </html>
