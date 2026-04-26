@@ -1,43 +1,43 @@
 """
 app.py  —  ISL Greetings Flask App  (Render free-tier, 512 MB safe)
 ====================================================================
-MEMORY STRATEGY — why the previous version OOM'd:
-  snapshot_download() buffers tf_model.h5 (~700 MB) in RAM → instant OOM.
+MEMORY STRATEGY:
+  mBERT  → HuggingFace Serverless Inference API (no local RAM used)
+  Sign   → hf_hub_download .keras → load locally (~20-50 MB, safe)
 
-FIX:
-  mBERT intent model  → HuggingFace Serverless Inference API (free HTTP
-                         endpoint). mBERT runs on HF's servers. We send
-                         text, we get a label back. Zero bytes loaded here.
-
-  CNN+BiLSTM sign model → hf_hub_download() streams the .keras file
-                          (~10-50 MB) directly to disk in /tmp, then
-                          Keras loads it. Total RAM stays well under 300 MB.
-
-Requirements (requirements.txt):
-    flask
-    tensorflow-cpu
-    opencv-python-headless
-    huggingface_hub
-    numpy
-    requests
-    gunicorn
-    transformers==4.40.2
-    tokenizers>=0.15,<0.20
+KERAS VERSION FIX:
+  Model was trained with Keras 2 (bundled in tensorflow 2.x).
+  Render installs tensorflow-cpu==2.15.0 + tf-keras==2.15.0.
+  We must set TF_USE_LEGACY_KERAS=1 AND import from tf_keras
+  (not keras) so TimeDistributed shape handling matches training.
 """
 
 import os, random, base64, cv2, json, time
 import numpy as np
 import requests
 
-# ── CRITICAL: set BEFORE any transformers import ─────────────────
+# ── MUST be set before ANY tensorflow / keras import ─────────────
 os.environ["USE_TF"]                            = "1"
 os.environ["USE_TORCH"]                         = "0"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"]              = "2"
+os.environ["TF_USE_LEGACY_KERAS"]               = "1"   # force Keras 2 inside TF 2.15
 
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+# Use tf_keras (the standalone Keras 2 package) so load_model
+# uses exactly the same Keras version the model was saved with.
+try:
+    import tf_keras as keras_compat
+    _load_model = keras_compat.models.load_model
+    _preprocess = keras_compat.applications.mobilenet_v2.preprocess_input
+    print("Using tf_keras (Keras 2 compat) for load_model")
+except ImportError:
+    # Fallback — should not happen if requirements.txt is correct
+    from tensorflow import keras as keras_compat
+    _load_model = keras_compat.models.load_model
+    _preprocess = keras_compat.applications.mobilenet_v2.preprocess_input
+    print("Fallback: using tensorflow.keras for load_model")
 
 from flask import Flask, render_template, request, jsonify, url_for
 from huggingface_hub import hf_hub_download
@@ -48,14 +48,10 @@ app = Flask(__name__)
 # 1.  CONFIG
 # ═══════════════════════════════════════════════════════════════════
 HF_REPO_ID = "rahul2025/isl"
-HF_TOKEN   = os.environ.get("HF_TOKEN", "")   # set in Render → Environment
+HF_TOKEN   = os.environ.get("HF_TOKEN", "")
 
-# HuggingFace Serverless Inference API for the intent model.
-# This endpoint runs mBERT on HF's own GPU/CPU cluster.
-# Docs: https://huggingface.co/docs/api-inference/
 HF_INFERENCE_URL = f"https://api-inference.huggingface.co/models/{HF_REPO_ID}"
 
-# Local paths for sign model (tiny files, safe for /tmp)
 SIGN_LOCAL = "/tmp/isl_sign_model.keras"
 LMAP_LOCAL = "/tmp/isl_label_map.json"
 
@@ -125,7 +121,7 @@ def _keyword_fallback(text: str):
     return "HELLO", 0.50
 
 # ═══════════════════════════════════════════════════════════════════
-# 3.  DOWNLOAD SIGN MODEL  (only small files — no mBERT download)
+# 3.  DOWNLOAD SIGN MODEL FILES ONLY  (mBERT never downloaded)
 # ═══════════════════════════════════════════════════════════════════
 def _download_sign_model():
     import shutil
@@ -163,45 +159,33 @@ def _download_sign_model():
 _download_sign_model()
 
 # ═══════════════════════════════════════════════════════════════════
-# 4.  LOAD SIGN MODEL  (Keras, ~20-50 MB, fits in 512 MB RAM easily)
+# 4.  LOAD SIGN MODEL with tf_keras (Keras 2 — matches training)
 # ═══════════════════════════════════════════════════════════════════
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 
 print("Loading CNN+BiLSTM sign model …")
-sign_model = load_model(SIGN_LOCAL)
+sign_model = _load_model(SIGN_LOCAL)
 print("Sign model loaded ✓")
 
 with open(LMAP_LOCAL, encoding="utf-8") as f:
-    label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
+    label_map = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════
 # 5.  INTENT PREDICTION via HF Serverless Inference API
-#
-#     The repo rahul2025/isl must be a text-classification model on HF.
-#     HF returns: [{"label": "HELLO", "score": 0.98}, ...]
-#     or nested:  [[{"label": "HELLO", "score": 0.98}, ...]]
-#
-#     Cold-start: HF may return 503 "Model is loading" for ~20 s on
-#     the very first call after inactivity. We retry up to 3 times,
-#     then fall back to keyword matching so the app never hard-fails.
 # ═══════════════════════════════════════════════════════════════════
 def _normalise_label(raw: str) -> str:
-    """Map whatever label string HF returns → our internal key."""
     r = raw.upper().strip()
     if r in LABEL2ID:
         return r
-    # LABEL_0 … LABEL_8 style
     if r.startswith("LABEL_"):
         try:
             return ID2LABEL[int(r.split("_", 1)[1])]
         except (ValueError, KeyError):
             pass
-    # Display-name style
     r2 = r.replace(" ", "_")
     if r2 in LABEL2ID:
         return r2
-    # Best-effort substring
     for k in LABEL2ID:
         if k in r or r in k:
             return k
@@ -209,10 +193,6 @@ def _normalise_label(raw: str) -> str:
 
 
 def predict_intent(text: str, retries: int = 3):
-    """
-    Call HF Inference API for text classification.
-    Never downloads mBERT weights — runs on HF's servers.
-    """
     headers = {"Content-Type": "application/json"}
     if HF_TOKEN:
         headers["Authorization"] = f"Bearer {HF_TOKEN}"
@@ -228,7 +208,6 @@ def predict_intent(text: str, retries: int = 3):
 
             if resp.status_code == 200:
                 data = resp.json()
-                # Flatten nested list  [[{...}]] → [{...}]
                 if isinstance(data, list) and data and isinstance(data[0], list):
                     data = data[0]
                 if isinstance(data, list) and data:
@@ -237,7 +216,6 @@ def predict_intent(text: str, retries: int = 3):
                     return label, round(best.get("score", 0.9), 4)
 
             elif resp.status_code == 503:
-                # Model is cold-starting on HF — wait the suggested time
                 try:
                     wait = float(resp.json().get("estimated_time", 20))
                 except Exception:
@@ -258,12 +236,11 @@ def predict_intent(text: str, retries: int = 3):
             print(f"  HF API exception: {exc}")
             break
 
-    # All retries exhausted — use local keyword fallback
     print("  Using keyword fallback for intent detection.")
     return _keyword_fallback(text)
 
 # ═══════════════════════════════════════════════════════════════════
-# 6.  SIGN PREDICTION HELPERS  (identical to original app.py)
+# 6.  SIGN PREDICTION HELPERS
 # ═══════════════════════════════════════════════════════════════════
 def decode_frames(frame_b64_list):
     frames = []
@@ -287,7 +264,7 @@ def frames_to_clip(frames):
         resized = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
         clip.append(resized.astype("float32"))
     clip = np.array(clip)
-    clip = preprocess_input(clip)
+    clip = _preprocess(clip)
     return clip[np.newaxis, ...]
 
 
