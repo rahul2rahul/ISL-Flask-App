@@ -286,7 +286,9 @@ def get_videos_for_label(label):
     label_clean = label.lower().replace("_", " ")
 
     for folder in os.listdir(base_root):
-        if folder.lower() == label_clean:
+        folder_lower = folder.lower()
+
+        if label_clean in folder_lower:
             folder_path = os.path.join(base_root, folder)
 
             for file in os.listdir(folder_path):
