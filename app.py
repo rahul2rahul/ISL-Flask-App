@@ -273,15 +273,29 @@ def frames_to_clip(frames):
 
 
 def get_video_for_label(label):
-    videos       = []
-    video_folder = os.path.join(app.static_folder, "videos", label)
-    if os.path.exists(video_folder):
-        files = [f for f in os.listdir(video_folder) if f.endswith(".mp4")]
-        if files:
-            selected = random.choice(files)
-            videos.append(
-                url_for("static", filename=f"videos/{label}/{selected}")
-            )
+    videos = []
+
+    # 🔥 convert label to match folder naming
+    folder_name = label.lower().replace("_", " ")
+
+    video_folder = os.path.join(app.static_folder, "videos", folder_name)
+
+    if not os.path.exists(video_folder):
+        print(f"[WARN] Folder not found: {video_folder}")
+        return []
+
+    files = [f for f in os.listdir(video_folder) if f.lower().endswith(".mp4")]
+
+    if not files:
+        print(f"[WARN] No videos in: {video_folder}")
+        return []
+
+    selected = random.choice(files)
+
+    video_url = url_for("static", filename=f"videos/{folder_name}/{selected}")
+    print(f"[OK] Video served: {video_url}")
+
+    videos.append(video_url)
     return videos
 
 # ═══════════════════════════════════════════════════════════════════
