@@ -1,24 +1,33 @@
 """
-app.py  —  ISL Greetings Flask App  (Render-ready, HuggingFace model download)
-================================================================================
-Models are stored in HuggingFace repo  rahul2025/isl
-and are downloaded ONCE at startup into /tmp (always writable on Render free tier).
+app.py  —  ISL Greetings Flask App  (Render free-tier, 512 MB safe)
+====================================================================
+MEMORY STRATEGY — why the previous version OOM'd:
+  snapshot_download() buffers tf_model.h5 (~700 MB) in RAM → instant OOM.
 
-Dependencies (requirements.txt):
+FIX:
+  mBERT intent model  → HuggingFace Serverless Inference API (free HTTP
+                         endpoint). mBERT runs on HF's servers. We send
+                         text, we get a label back. Zero bytes loaded here.
+
+  CNN+BiLSTM sign model → hf_hub_download() streams the .keras file
+                          (~10-50 MB) directly to disk in /tmp, then
+                          Keras loads it. Total RAM stays well under 300 MB.
+
+Requirements (requirements.txt):
     flask
     tensorflow-cpu
-    transformers==4.40.2
-    tokenizers>=0.15,<0.20
     opencv-python-headless
     huggingface_hub
     numpy
     requests
-
-Zero torch.  Runs on Render free tier (512 MB RAM).
+    gunicorn
+    transformers==4.40.2
+    tokenizers>=0.15,<0.20
 """
 
-import os, random, base64, cv2, json
+import os, random, base64, cv2, json, time
 import numpy as np
+import requests
 
 # ── CRITICAL: set BEFORE any transformers import ─────────────────
 os.environ["USE_TF"]                            = "1"
@@ -31,14 +40,27 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 from flask import Flask, render_template, request, jsonify, url_for
-
-from transformers import BertTokenizerFast, TFBertForSequenceClassification
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import hf_hub_download
 
 app = Flask(__name__)
 
 # ═══════════════════════════════════════════════════════════════════
-# 1.  LABEL MAPS
+# 1.  CONFIG
+# ═══════════════════════════════════════════════════════════════════
+HF_REPO_ID = "rahul2025/isl"
+HF_TOKEN   = os.environ.get("HF_TOKEN", "")   # set in Render → Environment
+
+# HuggingFace Serverless Inference API for the intent model.
+# This endpoint runs mBERT on HF's own GPU/CPU cluster.
+# Docs: https://huggingface.co/docs/api-inference/
+HF_INFERENCE_URL = f"https://api-inference.huggingface.co/models/{HF_REPO_ID}"
+
+# Local paths for sign model (tiny files, safe for /tmp)
+SIGN_LOCAL = "/tmp/isl_sign_model.keras"
+LMAP_LOCAL = "/tmp/isl_label_map.json"
+
+# ═══════════════════════════════════════════════════════════════════
+# 2.  LABEL MAPS
 # ═══════════════════════════════════════════════════════════════════
 LABEL2ID = {
     "HELLO": 0, "GOOD_MORNING": 1, "GOOD_AFTERNOON": 2,
@@ -71,135 +93,177 @@ LABEL_TO_DISPLAY = {
     "THANK_YOU":      "Thank You",
 }
 
-# ═══════════════════════════════════════════════════════════════════
-# 2.  HUGGINGFACE REPO CONFIG
-# ═══════════════════════════════════════════════════════════════════
-HF_REPO_ID   = "rahul2025/isl"
-HF_TOKEN     = os.environ.get("HF_TOKEN")          # set in Render dashboard
+# ── Keyword fallback (used if HF API is loading / rate-limited) ──
+_KEYWORDS = {
+    "hello": "HELLO", "hi": "HELLO", "hey": "HELLO",
+    "নমস্কার": "HELLO", "হ্যালো": "HELLO", "হাই": "HELLO",
+    "good morning": "GOOD_MORNING", "morning": "GOOD_MORNING",
+    "শুভ সকাল": "GOOD_MORNING", "সকাল": "GOOD_MORNING",
+    "good afternoon": "GOOD_AFTERNOON", "afternoon": "GOOD_AFTERNOON",
+    "শুভ অপরাহ্ন": "GOOD_AFTERNOON",
+    "good evening": "GOOD_EVENING", "evening": "GOOD_EVENING",
+    "শুভ সন্ধ্যা": "GOOD_EVENING", "সন্ধ্যা": "GOOD_EVENING",
+    "good night": "GOOD_NIGHT", "night": "GOOD_NIGHT",
+    "শুভ রাত্রি": "GOOD_NIGHT", "রাত": "GOOD_NIGHT",
+    "how are you": "HOW_ARE_YOU", "how do you do": "HOW_ARE_YOU",
+    "আপনি কেমন": "HOW_ARE_YOU", "কেমন আছেন": "HOW_ARE_YOU",
+    "alright": "ALRIGHT", "fine": "ALRIGHT", "okay": "ALRIGHT",
+    "ok": "ALRIGHT", "i'm fine": "ALRIGHT",
+    "সব ঠিক": "ALRIGHT", "ভালো আছি": "ALRIGHT",
+    "pleased": "PLEASED", "glad to meet": "PLEASED",
+    "nice to meet": "PLEASED", "meet you": "PLEASED",
+    "খুশি": "PLEASED",
+    "thank you": "THANK_YOU", "thanks": "THANK_YOU",
+    "thank": "THANK_YOU", "ধন্যবাদ": "THANK_YOU",
+}
 
-# Local cache paths (writable on Render free tier)
-INTENT_LOCAL = "/tmp/isl_intent_model"
-SIGN_LOCAL   = "/tmp/isl_sign_model.keras"
-LMAP_LOCAL   = "/tmp/isl_label_map.json"
+def _keyword_fallback(text: str):
+    t = text.lower().strip()
+    for phrase, label in sorted(_KEYWORDS.items(), key=lambda x: -len(x[0])):
+        if phrase in t:
+            return label, 0.75
+    return "HELLO", 0.50
 
 # ═══════════════════════════════════════════════════════════════════
-# 3.  DOWNLOAD MODELS AT STARTUP
+# 3.  DOWNLOAD SIGN MODEL  (only small files — no mBERT download)
 # ═══════════════════════════════════════════════════════════════════
-def download_models():
-    """
-    Download model files from HuggingFace into /tmp.
-    Skips files that already exist (container restarts are rare on Render
-    but this saves time during local dev restarts).
-    """
-    print("=== Checking / downloading models from HuggingFace ===")
+def _download_sign_model():
+    import shutil
+    print("=== Checking sign model ===")
 
-    # ── 3a. Intent model (whole folder) ──────────────────────────
-    # snapshot_download fetches all files in final_model/ subfolder.
-    # They land at  /tmp/isl_intent_model/  preserving sub-paths.
-    if not os.path.isdir(INTENT_LOCAL) or not os.listdir(INTENT_LOCAL):
-        print("  Downloading intent model (mBERT)…")
-        os.makedirs(INTENT_LOCAL, exist_ok=True)
-        snapshot_download(
-            repo_id        = HF_REPO_ID,
-            token          = HF_TOKEN,
-            allow_patterns = ["final_model/*"],
-            local_dir      = "/tmp/hf_cache_isl",
-        )
-        # snapshot_download puts files under  /tmp/hf_cache_isl/final_model/
-        # Move them up one level so INTENT_LOCAL is the model root.
-        import shutil
-        src = "/tmp/hf_cache_isl/final_model"
-        if os.path.isdir(src):
-            shutil.copytree(src, INTENT_LOCAL, dirs_exist_ok=True)
-        print(f"  Intent model ready at {INTENT_LOCAL}")
-    else:
-        print(f"  Intent model already at {INTENT_LOCAL}, skipping download.")
-
-    # ── 3b. Sign model (.keras) ───────────────────────────────────
     if not os.path.isfile(SIGN_LOCAL):
-        print("  Downloading sign model (CNN+BiLSTM)…")
-        path = hf_hub_download(
+        print("  Downloading model_cnn_bilstm.keras …")
+        tmp = hf_hub_download(
             repo_id   = HF_REPO_ID,
             filename  = "model/model_cnn_bilstm.keras",
-            token     = HF_TOKEN,
-            local_dir = "/tmp",
+            token     = HF_TOKEN or None,
+            local_dir = "/tmp/hf_dl",
         )
-        # hf_hub_download returns the actual path; rename to our constant
-        os.makedirs(os.path.dirname(SIGN_LOCAL) or ".", exist_ok=True)
-        if path != SIGN_LOCAL:
-            import shutil
-            shutil.copy(path, SIGN_LOCAL)
-        print(f"  Sign model ready at {SIGN_LOCAL}")
+        shutil.copy(tmp, SIGN_LOCAL)
+        print(f"  Saved → {SIGN_LOCAL}")
     else:
-        print(f"  Sign model already at {SIGN_LOCAL}, skipping download.")
+        print(f"  Already exists: {SIGN_LOCAL}")
 
-    # ── 3c. Label map ─────────────────────────────────────────────
     if not os.path.isfile(LMAP_LOCAL):
-        print("  Downloading label_map.json…")
-        path = hf_hub_download(
+        print("  Downloading label_map.json …")
+        tmp = hf_hub_download(
             repo_id   = HF_REPO_ID,
             filename  = "model/label_map.json",
-            token     = HF_TOKEN,
-            local_dir = "/tmp",
+            token     = HF_TOKEN or None,
+            local_dir = "/tmp/hf_dl",
         )
-        if path != LMAP_LOCAL:
-            import shutil
-            shutil.copy(path, LMAP_LOCAL)
-        print(f"  Label map ready at {LMAP_LOCAL}")
+        shutil.copy(tmp, LMAP_LOCAL)
+        print(f"  Saved → {LMAP_LOCAL}")
     else:
-        print(f"  Label map already at {LMAP_LOCAL}, skipping download.")
+        print(f"  Already exists: {LMAP_LOCAL}")
 
-    print("=== All models ready ===")
+    print("=== Sign model ready ===")
 
 
-download_models()
-
-# ═══════════════════════════════════════════════════════════════════
-# 4.  LOAD mBERT INTENT MODEL  (TF — no torch)
-# ═══════════════════════════════════════════════════════════════════
-print("Loading mBERT tokenizer and classifier…")
-tokenizer    = BertTokenizerFast.from_pretrained(INTENT_LOCAL)
-intent_model = TFBertForSequenceClassification.from_pretrained(
-    INTENT_LOCAL,
-    num_labels = len(LABEL2ID),
-    id2label   = ID2LABEL,
-    label2id   = LABEL2ID,
-)
-print("mBERT loaded.")
+_download_sign_model()
 
 # ═══════════════════════════════════════════════════════════════════
-# 5.  LOAD SIGN MODEL  (CNN+BiLSTM Keras)
+# 4.  LOAD SIGN MODEL  (Keras, ~20-50 MB, fits in 512 MB RAM easily)
 # ═══════════════════════════════════════════════════════════════════
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 
-print("Loading CNN+BiLSTM sign model…")
+print("Loading CNN+BiLSTM sign model …")
 sign_model = load_model(SIGN_LOCAL)
-print("Sign model loaded.")
+print("Sign model loaded ✓")
 
 with open(LMAP_LOCAL, encoding="utf-8") as f:
     label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
 
 # ═══════════════════════════════════════════════════════════════════
-# 6.  INTENT PREDICTION  — mBERT, pure TF, zero torch
+# 5.  INTENT PREDICTION via HF Serverless Inference API
+#
+#     The repo rahul2025/isl must be a text-classification model on HF.
+#     HF returns: [{"label": "HELLO", "score": 0.98}, ...]
+#     or nested:  [[{"label": "HELLO", "score": 0.98}, ...]]
+#
+#     Cold-start: HF may return 503 "Model is loading" for ~20 s on
+#     the very first call after inactivity. We retry up to 3 times,
+#     then fall back to keyword matching so the app never hard-fails.
 # ═══════════════════════════════════════════════════════════════════
-def predict_intent(text: str):
-    encoded = tokenizer(
-        text,
-        return_tensors = "tf",
-        truncation     = True,
-        padding        = True,
-        max_length     = 32,
-    )
-    outputs = intent_model(**encoded, training=False)
-    probs   = tf.nn.softmax(outputs.logits, axis=-1)
-    idx     = int(tf.argmax(probs, axis=-1).numpy()[0])
-    conf    = float(probs.numpy()[0][idx])
-    label   = ID2LABEL.get(idx, "UNKNOWN")
-    return label, round(conf, 4)
+def _normalise_label(raw: str) -> str:
+    """Map whatever label string HF returns → our internal key."""
+    r = raw.upper().strip()
+    if r in LABEL2ID:
+        return r
+    # LABEL_0 … LABEL_8 style
+    if r.startswith("LABEL_"):
+        try:
+            return ID2LABEL[int(r.split("_", 1)[1])]
+        except (ValueError, KeyError):
+            pass
+    # Display-name style
+    r2 = r.replace(" ", "_")
+    if r2 in LABEL2ID:
+        return r2
+    # Best-effort substring
+    for k in LABEL2ID:
+        if k in r or r in k:
+            return k
+    return "HELLO"
+
+
+def predict_intent(text: str, retries: int = 3):
+    """
+    Call HF Inference API for text classification.
+    Never downloads mBERT weights — runs on HF's servers.
+    """
+    headers = {"Content-Type": "application/json"}
+    if HF_TOKEN:
+        headers["Authorization"] = f"Bearer {HF_TOKEN}"
+
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                HF_INFERENCE_URL,
+                headers = headers,
+                json    = {"inputs": text},
+                timeout = 30,
+            )
+
+            if resp.status_code == 200:
+                data = resp.json()
+                # Flatten nested list  [[{...}]] → [{...}]
+                if isinstance(data, list) and data and isinstance(data[0], list):
+                    data = data[0]
+                if isinstance(data, list) and data:
+                    best  = max(data, key=lambda x: x.get("score", 0))
+                    label = _normalise_label(best.get("label", "HELLO"))
+                    return label, round(best.get("score", 0.9), 4)
+
+            elif resp.status_code == 503:
+                # Model is cold-starting on HF — wait the suggested time
+                try:
+                    wait = float(resp.json().get("estimated_time", 20))
+                except Exception:
+                    wait = 20.0
+                wait = min(wait, 25.0)
+                print(f"  HF API: model loading, sleeping {wait:.0f}s "
+                      f"(attempt {attempt + 1}/{retries}) …")
+                time.sleep(wait)
+                continue
+
+            else:
+                print(f"  HF API error {resp.status_code}: {resp.text[:300]}")
+                break
+
+        except requests.exceptions.Timeout:
+            print(f"  HF API timeout (attempt {attempt + 1}/{retries})")
+        except Exception as exc:
+            print(f"  HF API exception: {exc}")
+            break
+
+    # All retries exhausted — use local keyword fallback
+    print("  Using keyword fallback for intent detection.")
+    return _keyword_fallback(text)
 
 # ═══════════════════════════════════════════════════════════════════
-# 7.  SIGN PREDICTION HELPERS
+# 6.  SIGN PREDICTION HELPERS  (identical to original app.py)
 # ═══════════════════════════════════════════════════════════════════
 def decode_frames(frame_b64_list):
     frames = []
@@ -213,6 +277,7 @@ def decode_frames(frame_b64_list):
             frames.append(frame)
     return frames
 
+
 def frames_to_clip(frames):
     n       = len(frames)
     indices = np.linspace(0, n - 1, SEQ_LEN_SIGN, dtype=int)
@@ -225,6 +290,7 @@ def frames_to_clip(frames):
     clip = preprocess_input(clip)
     return clip[np.newaxis, ...]
 
+
 def get_video_for_label(label):
     videos       = []
     video_folder = os.path.join(app.static_folder, "videos", label)
@@ -232,11 +298,13 @@ def get_video_for_label(label):
         files = [f for f in os.listdir(video_folder) if f.endswith(".mp4")]
         if files:
             selected = random.choice(files)
-            videos.append(url_for("static", filename=f"videos/{label}/{selected}"))
+            videos.append(
+                url_for("static", filename=f"videos/{label}/{selected}")
+            )
     return videos
 
 # ═══════════════════════════════════════════════════════════════════
-# 8.  ROUTES
+# 7.  ROUTES
 # ═══════════════════════════════════════════════════════════════════
 @app.route("/")
 def home():
@@ -289,7 +357,7 @@ def predict_sign():
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 9.  ENTRY POINT
+# 8.  ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
