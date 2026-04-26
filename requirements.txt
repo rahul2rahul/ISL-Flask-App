@@ -1,18 +1,9 @@
-# ── Web framework ─────────────────────────────────────────────────
-flask==3.0.3
-gunicorn==22.0.0
-
-# ── TensorFlow CPU-only ───────────────────────────────────────────
-tensorflow-cpu==2.15.1
-
-# ── HuggingFace ───────────────────────────────────────────────────
+flask
+tensorflow-cpu
+opencv-python-headless
+huggingface_hub
+numpy
+requests
+gunicorn
 transformers==4.40.2
-huggingface-hub==0.23.4
-tokenizers==0.19.1
-
-# ── Vision / array ────────────────────────────────────────────────
-opencv-python-headless==4.9.0.80
-numpy==1.26.4
-
-# ── Misc ──────────────────────────────────────────────────────────
-requests==2.32.3
+tokenizers>=0.15,<0.20
