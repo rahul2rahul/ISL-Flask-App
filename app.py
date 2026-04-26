@@ -2,40 +2,34 @@
 app.py  —  ISL Greetings Flask App  (Render free-tier, 512 MB safe)
 ====================================================================
 
-ROOT CAUSE OF ALL PREVIOUS ERRORS:
-  Your model_cnn_bilstm.keras was saved with Keras 3 (the format that
-  uses 'batch_shape' in InputLayer config). tensorflow-cpu 2.15 bundles
-  Keras 2, which cannot read Keras 3 files → "batch_shape" error.
-  tf-keras (standalone Keras 2) also cannot read Keras 3 files → same.
+ENVIRONMENT (must match local exactly):
+  Local:  TensorFlow 2.18.0 + Keras 3.8.0 + Python 3.10.13
+  Render: tensorflow-cpu==2.18.0 + keras==3.8.0 + Python 3.10.13
+  → Both identical → model_cnn_bilstm.keras loads without errors.
 
-THE DEFINITIVE FIX:
-  Use tensorflow-cpu==2.16.2, which ships Keras 3 as its default Keras.
-  Keras 3 reads your .keras file perfectly.
-  No TF_USE_LEGACY_KERAS. No tf-keras. No from_pt gymnastics.
-
-MEMORY STRATEGY (stays under 512 MB):
-  mBERT intent model  → HuggingFace Serverless Inference API (zero RAM here)
-  CNN+BiLSTM sign model → downloaded from HF (~20-50 MB) + loaded locally
+MEMORY STRATEGY (stays under 512 MB on Render free tier):
+  mBERT intent model  → HuggingFace Serverless Inference API
+                         (HTTP POST only, zero RAM on our server)
+  CNN+BiLSTM sign     → downloaded from HF (~20-50 MB), loaded locally
 """
 
 import os, random, base64, cv2, json, time
 import numpy as np
 import requests
 
-# ── Set BEFORE any tensorflow / keras import ─────────────────────
+# ── MUST be set before any tensorflow/keras import ───────────────
 os.environ["USE_TF"]                            = "1"
 os.environ["USE_TORCH"]                         = "0"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"]              = "2"
-# Do NOT set TF_USE_LEGACY_KERAS — that breaks Keras 3 model loading
 
-from flask import Flask, render_template, request, jsonify, url_for
-from huggingface_hub import hf_hub_download
-
-# Import Keras 3 (bundled inside tensorflow 2.16)
+# Keras 3.8 is standalone — import directly, not via tensorflow.keras
 import keras
 from keras.models import load_model
 from keras.applications.mobilenet_v2 import preprocess_input
+
+from flask import Flask, render_template, request, jsonify, url_for
+from huggingface_hub import hf_hub_download
 
 app = Flask(__name__)
 
@@ -45,8 +39,7 @@ app = Flask(__name__)
 HF_REPO_ID = "rahul2025/isl"
 HF_TOKEN   = os.environ.get("HF_TOKEN", "")
 
-# HuggingFace Serverless Inference API — mBERT runs on HF servers,
-# zero bytes of mBERT weights are ever loaded into our 512 MB RAM.
+# mBERT runs on HF servers — zero RAM cost here
 HF_INFERENCE_URL = f"https://api-inference.huggingface.co/models/{HF_REPO_ID}"
 
 SIGN_LOCAL = "/tmp/isl_sign_model.keras"
@@ -86,7 +79,7 @@ LABEL_TO_DISPLAY = {
     "THANK_YOU":      "Thank You",
 }
 
-# ── Keyword fallback when HF Inference API is cold-starting ──────
+# ── Keyword fallback (when HF API cold-starts) ───────────────────
 _KEYWORDS = {
     "good morning":   "GOOD_MORNING",
     "good afternoon": "GOOD_AFTERNOON",
@@ -129,14 +122,13 @@ _KEYWORDS = {
 
 def _keyword_fallback(text: str):
     t = text.lower().strip()
-    # longest-match first so "good morning" beats "morning"
     for phrase, label in sorted(_KEYWORDS.items(), key=lambda x: -len(x[0])):
         if phrase in t:
             return label, 0.75
     return "HELLO", 0.50
 
 # ═══════════════════════════════════════════════════════════════════
-# 3.  DOWNLOAD SIGN MODEL FILES  (mBERT is NEVER downloaded)
+# 3.  DOWNLOAD SIGN MODEL  (mBERT never downloaded — saves all RAM)
 # ═══════════════════════════════════════════════════════════════════
 def _download_sign_model():
     import shutil
@@ -174,7 +166,7 @@ def _download_sign_model():
 _download_sign_model()
 
 # ═══════════════════════════════════════════════════════════════════
-# 4.  LOAD SIGN MODEL with Keras 3  (matches how model was saved)
+# 4.  LOAD SIGN MODEL
 # ═══════════════════════════════════════════════════════════════════
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
@@ -185,28 +177,23 @@ sign_model = load_model(SIGN_LOCAL)
 print("Sign model loaded ✓")
 
 with open(LMAP_LOCAL, encoding="utf-8") as f:
-    label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
+    label_map = json.load(f)
 
 # ═══════════════════════════════════════════════════════════════════
 # 5.  INTENT PREDICTION via HF Serverless Inference API
-#     mBERT weights never touch this server. Zero RAM cost.
 # ═══════════════════════════════════════════════════════════════════
 def _normalise_label(raw: str) -> str:
-    """Map whatever string HF returns → our internal key."""
     r = raw.upper().strip()
     if r in LABEL2ID:
         return r
-    # LABEL_0 … LABEL_8
     if r.startswith("LABEL_"):
         try:
             return ID2LABEL[int(r.split("_", 1)[1])]
         except (ValueError, KeyError):
             pass
-    # spaces → underscores
     r2 = r.replace(" ", "_")
     if r2 in LABEL2ID:
         return r2
-    # substring match
     for k in LABEL2ID:
         if k in r or r in k:
             return k
@@ -226,19 +213,15 @@ def predict_intent(text: str, retries: int = 3):
                 json    = {"inputs": text},
                 timeout = 30,
             )
-
             if resp.status_code == 200:
                 data = resp.json()
-                # Flatten [[{...}]] → [{...}]
                 if isinstance(data, list) and data and isinstance(data[0], list):
                     data = data[0]
                 if isinstance(data, list) and data:
                     best  = max(data, key=lambda x: x.get("score", 0))
                     label = _normalise_label(best.get("label", "HELLO"))
                     return label, round(best.get("score", 0.9), 4)
-
             elif resp.status_code == 503:
-                # HF model is cold-starting
                 try:
                     wait = float(resp.json().get("estimated_time", 20))
                 except Exception:
@@ -248,18 +231,16 @@ def predict_intent(text: str, retries: int = 3):
                       f"(attempt {attempt + 1}/{retries}) …")
                 time.sleep(wait)
                 continue
-
             else:
-                print(f"  HF API error {resp.status_code}: {resp.text[:300]}")
+                print(f"  HF API {resp.status_code}: {resp.text[:200]}")
                 break
-
         except requests.exceptions.Timeout:
             print(f"  HF API timeout (attempt {attempt + 1}/{retries})")
         except Exception as exc:
-            print(f"  HF API exception: {exc}")
+            print(f"  HF API error: {exc}")
             break
 
-    print("  Falling back to keyword intent detection.")
+    print("  Using keyword fallback.")
     return _keyword_fallback(text)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -317,9 +298,7 @@ def process_speech():
     text = data.get("text", "").strip()
     if not text:
         return jsonify({"error": "No input text"}), 400
-
     intent_label, confidence = predict_intent(text)
-
     return jsonify({
         "input_text":      text,
         "predicted_label": intent_label,
@@ -336,17 +315,14 @@ def predict_sign():
     frame_list = data.get("frames", [])
     if not frame_list:
         return jsonify({"error": "No frames received"}), 400
-
     frames = decode_frames(frame_list)
     if len(frames) < 5:
         return jsonify({"error": "Too few valid frames captured"}), 400
-
     clip            = frames_to_clip(frames)
     preds           = sign_model.predict(clip, verbose=0)
     class_idx       = int(np.argmax(preds[0]))
     confidence      = float(np.max(preds[0]))
     predicted_label = label_map.get(str(class_idx), "UNKNOWN")
-
     return jsonify({
         "predicted_label": predicted_label,
         "display_name":    LABEL_TO_DISPLAY.get(predicted_label, predicted_label),
