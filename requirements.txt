@@ -1,8 +1,9 @@
 flask
-tensorflow-cpu
+tensorflow-cpu==2.15.0
+tf-keras==2.15.0
 opencv-python-headless
 huggingface_hub
-numpy
+numpy==1.26.4
 requests
 gunicorn
 transformers==4.40.2
