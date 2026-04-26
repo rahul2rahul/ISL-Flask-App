@@ -1,46 +1,41 @@
 """
 app.py  —  ISL Greetings Flask App  (Render free-tier, 512 MB safe)
 ====================================================================
-MEMORY STRATEGY:
-  mBERT  → HuggingFace Serverless Inference API (no local RAM used)
-  Sign   → hf_hub_download .keras → load locally (~20-50 MB, safe)
 
-KERAS VERSION FIX:
-  Model was trained with Keras 2 (bundled in tensorflow 2.x).
-  Render installs tensorflow-cpu==2.15.0 + tf-keras==2.15.0.
-  We must set TF_USE_LEGACY_KERAS=1 AND import from tf_keras
-  (not keras) so TimeDistributed shape handling matches training.
+ROOT CAUSE OF ALL PREVIOUS ERRORS:
+  Your model_cnn_bilstm.keras was saved with Keras 3 (the format that
+  uses 'batch_shape' in InputLayer config). tensorflow-cpu 2.15 bundles
+  Keras 2, which cannot read Keras 3 files → "batch_shape" error.
+  tf-keras (standalone Keras 2) also cannot read Keras 3 files → same.
+
+THE DEFINITIVE FIX:
+  Use tensorflow-cpu==2.16.2, which ships Keras 3 as its default Keras.
+  Keras 3 reads your .keras file perfectly.
+  No TF_USE_LEGACY_KERAS. No tf-keras. No from_pt gymnastics.
+
+MEMORY STRATEGY (stays under 512 MB):
+  mBERT intent model  → HuggingFace Serverless Inference API (zero RAM here)
+  CNN+BiLSTM sign model → downloaded from HF (~20-50 MB) + loaded locally
 """
 
 import os, random, base64, cv2, json, time
 import numpy as np
 import requests
 
-# ── MUST be set before ANY tensorflow / keras import ─────────────
+# ── Set BEFORE any tensorflow / keras import ─────────────────────
 os.environ["USE_TF"]                            = "1"
 os.environ["USE_TORCH"]                         = "0"
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"]              = "2"
-os.environ["TF_USE_LEGACY_KERAS"]               = "1"   # force Keras 2 inside TF 2.15
-
-import tensorflow as tf
-
-# Use tf_keras (the standalone Keras 2 package) so load_model
-# uses exactly the same Keras version the model was saved with.
-try:
-    import tf_keras as keras_compat
-    _load_model = keras_compat.models.load_model
-    _preprocess = keras_compat.applications.mobilenet_v2.preprocess_input
-    print("Using tf_keras (Keras 2 compat) for load_model")
-except ImportError:
-    # Fallback — should not happen if requirements.txt is correct
-    from tensorflow import keras as keras_compat
-    _load_model = keras_compat.models.load_model
-    _preprocess = keras_compat.applications.mobilenet_v2.preprocess_input
-    print("Fallback: using tensorflow.keras for load_model")
+# Do NOT set TF_USE_LEGACY_KERAS — that breaks Keras 3 model loading
 
 from flask import Flask, render_template, request, jsonify, url_for
 from huggingface_hub import hf_hub_download
+
+# Import Keras 3 (bundled inside tensorflow 2.16)
+import keras
+from keras.models import load_model
+from keras.applications.mobilenet_v2 import preprocess_input
 
 app = Flask(__name__)
 
@@ -50,6 +45,8 @@ app = Flask(__name__)
 HF_REPO_ID = "rahul2025/isl"
 HF_TOKEN   = os.environ.get("HF_TOKEN", "")
 
+# HuggingFace Serverless Inference API — mBERT runs on HF servers,
+# zero bytes of mBERT weights are ever loaded into our 512 MB RAM.
 HF_INFERENCE_URL = f"https://api-inference.huggingface.co/models/{HF_REPO_ID}"
 
 SIGN_LOCAL = "/tmp/isl_sign_model.keras"
@@ -89,39 +86,57 @@ LABEL_TO_DISPLAY = {
     "THANK_YOU":      "Thank You",
 }
 
-# ── Keyword fallback (used if HF API is loading / rate-limited) ──
+# ── Keyword fallback when HF Inference API is cold-starting ──────
 _KEYWORDS = {
-    "hello": "HELLO", "hi": "HELLO", "hey": "HELLO",
-    "নমস্কার": "HELLO", "হ্যালো": "HELLO", "হাই": "HELLO",
-    "good morning": "GOOD_MORNING", "morning": "GOOD_MORNING",
-    "শুভ সকাল": "GOOD_MORNING", "সকাল": "GOOD_MORNING",
-    "good afternoon": "GOOD_AFTERNOON", "afternoon": "GOOD_AFTERNOON",
-    "শুভ অপরাহ্ন": "GOOD_AFTERNOON",
-    "good evening": "GOOD_EVENING", "evening": "GOOD_EVENING",
-    "শুভ সন্ধ্যা": "GOOD_EVENING", "সন্ধ্যা": "GOOD_EVENING",
-    "good night": "GOOD_NIGHT", "night": "GOOD_NIGHT",
-    "শুভ রাত্রি": "GOOD_NIGHT", "রাত": "GOOD_NIGHT",
-    "how are you": "HOW_ARE_YOU", "how do you do": "HOW_ARE_YOU",
-    "আপনি কেমন": "HOW_ARE_YOU", "কেমন আছেন": "HOW_ARE_YOU",
-    "alright": "ALRIGHT", "fine": "ALRIGHT", "okay": "ALRIGHT",
-    "ok": "ALRIGHT", "i'm fine": "ALRIGHT",
-    "সব ঠিক": "ALRIGHT", "ভালো আছি": "ALRIGHT",
-    "pleased": "PLEASED", "glad to meet": "PLEASED",
-    "nice to meet": "PLEASED", "meet you": "PLEASED",
-    "খুশি": "PLEASED",
-    "thank you": "THANK_YOU", "thanks": "THANK_YOU",
-    "thank": "THANK_YOU", "ধন্যবাদ": "THANK_YOU",
+    "good morning":   "GOOD_MORNING",
+    "good afternoon": "GOOD_AFTERNOON",
+    "good evening":   "GOOD_EVENING",
+    "good night":     "GOOD_NIGHT",
+    "how are you":    "HOW_ARE_YOU",
+    "how do you do":  "HOW_ARE_YOU",
+    "nice to meet":   "PLEASED",
+    "glad to meet":   "PLEASED",
+    "meet you":       "PLEASED",
+    "thank you":      "THANK_YOU",
+    "i'm fine":       "ALRIGHT",
+    "শুভ সকাল":      "GOOD_MORNING",
+    "শুভ অপরাহ্ন":   "GOOD_AFTERNOON",
+    "শুভ সন্ধ্যা":    "GOOD_EVENING",
+    "শুভ রাত্রি":     "GOOD_NIGHT",
+    "আপনি কেমন":     "HOW_ARE_YOU",
+    "কেমন আছেন":     "HOW_ARE_YOU",
+    "সব ঠিক":        "ALRIGHT",
+    "ভালো আছি":      "ALRIGHT",
+    "ধন্যবাদ":       "THANK_YOU",
+    "নমস্কার":       "HELLO",
+    "morning":        "GOOD_MORNING",
+    "afternoon":      "GOOD_AFTERNOON",
+    "evening":        "GOOD_EVENING",
+    "night":          "GOOD_NIGHT",
+    "pleased":        "PLEASED",
+    "thanks":         "THANK_YOU",
+    "thank":          "THANK_YOU",
+    "alright":        "ALRIGHT",
+    "fine":           "ALRIGHT",
+    "okay":           "ALRIGHT",
+    "hello":          "HELLO",
+    "হ্যালো":        "HELLO",
+    "হাই":           "HELLO",
+    "hi":             "HELLO",
+    "hey":            "HELLO",
+    "খুশি":          "PLEASED",
 }
 
 def _keyword_fallback(text: str):
     t = text.lower().strip()
+    # longest-match first so "good morning" beats "morning"
     for phrase, label in sorted(_KEYWORDS.items(), key=lambda x: -len(x[0])):
         if phrase in t:
             return label, 0.75
     return "HELLO", 0.50
 
 # ═══════════════════════════════════════════════════════════════════
-# 3.  DOWNLOAD SIGN MODEL FILES ONLY  (mBERT never downloaded)
+# 3.  DOWNLOAD SIGN MODEL FILES  (mBERT is NEVER downloaded)
 # ═══════════════════════════════════════════════════════════════════
 def _download_sign_model():
     import shutil
@@ -138,7 +153,7 @@ def _download_sign_model():
         shutil.copy(tmp, SIGN_LOCAL)
         print(f"  Saved → {SIGN_LOCAL}")
     else:
-        print(f"  Already exists: {SIGN_LOCAL}")
+        print(f"  Already cached: {SIGN_LOCAL}")
 
     if not os.path.isfile(LMAP_LOCAL):
         print("  Downloading label_map.json …")
@@ -151,7 +166,7 @@ def _download_sign_model():
         shutil.copy(tmp, LMAP_LOCAL)
         print(f"  Saved → {LMAP_LOCAL}")
     else:
-        print(f"  Already exists: {LMAP_LOCAL}")
+        print(f"  Already cached: {LMAP_LOCAL}")
 
     print("=== Sign model ready ===")
 
@@ -159,33 +174,39 @@ def _download_sign_model():
 _download_sign_model()
 
 # ═══════════════════════════════════════════════════════════════════
-# 4.  LOAD SIGN MODEL with tf_keras (Keras 2 — matches training)
+# 4.  LOAD SIGN MODEL with Keras 3  (matches how model was saved)
 # ═══════════════════════════════════════════════════════════════════
 SEQ_LEN_SIGN = 15
 IMG_SIZE     = 96
 
+print(f"Keras version: {keras.__version__}")
 print("Loading CNN+BiLSTM sign model …")
-sign_model = _load_model(SIGN_LOCAL)
+sign_model = load_model(SIGN_LOCAL)
 print("Sign model loaded ✓")
 
 with open(LMAP_LOCAL, encoding="utf-8") as f:
-    label_map = json.load(f)
+    label_map = json.load(f)   # {"0": "ALRIGHT", "1": "GOOD_MORNING", ...}
 
 # ═══════════════════════════════════════════════════════════════════
 # 5.  INTENT PREDICTION via HF Serverless Inference API
+#     mBERT weights never touch this server. Zero RAM cost.
 # ═══════════════════════════════════════════════════════════════════
 def _normalise_label(raw: str) -> str:
+    """Map whatever string HF returns → our internal key."""
     r = raw.upper().strip()
     if r in LABEL2ID:
         return r
+    # LABEL_0 … LABEL_8
     if r.startswith("LABEL_"):
         try:
             return ID2LABEL[int(r.split("_", 1)[1])]
         except (ValueError, KeyError):
             pass
+    # spaces → underscores
     r2 = r.replace(" ", "_")
     if r2 in LABEL2ID:
         return r2
+    # substring match
     for k in LABEL2ID:
         if k in r or r in k:
             return k
@@ -208,6 +229,7 @@ def predict_intent(text: str, retries: int = 3):
 
             if resp.status_code == 200:
                 data = resp.json()
+                # Flatten [[{...}]] → [{...}]
                 if isinstance(data, list) and data and isinstance(data[0], list):
                     data = data[0]
                 if isinstance(data, list) and data:
@@ -216,12 +238,13 @@ def predict_intent(text: str, retries: int = 3):
                     return label, round(best.get("score", 0.9), 4)
 
             elif resp.status_code == 503:
+                # HF model is cold-starting
                 try:
                     wait = float(resp.json().get("estimated_time", 20))
                 except Exception:
                     wait = 20.0
                 wait = min(wait, 25.0)
-                print(f"  HF API: model loading, sleeping {wait:.0f}s "
+                print(f"  HF model loading — sleeping {wait:.0f}s "
                       f"(attempt {attempt + 1}/{retries}) …")
                 time.sleep(wait)
                 continue
@@ -236,7 +259,7 @@ def predict_intent(text: str, retries: int = 3):
             print(f"  HF API exception: {exc}")
             break
 
-    print("  Using keyword fallback for intent detection.")
+    print("  Falling back to keyword intent detection.")
     return _keyword_fallback(text)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -264,7 +287,7 @@ def frames_to_clip(frames):
         resized = cv2.resize(rgb, (IMG_SIZE, IMG_SIZE))
         clip.append(resized.astype("float32"))
     clip = np.array(clip)
-    clip = _preprocess(clip)
+    clip = preprocess_input(clip)
     return clip[np.newaxis, ...]
 
 
