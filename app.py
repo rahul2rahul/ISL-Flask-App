@@ -275,6 +275,8 @@ def frames_to_clip(frames):
 import os
 from flask import url_for
 
+import random
+
 def get_videos_for_label(label):
     base_root = os.path.join("static", "videos")
     videos = []
@@ -286,18 +288,22 @@ def get_videos_for_label(label):
     label_clean = label.lower().replace("_", " ")
 
     for folder in os.listdir(base_root):
-        folder_lower = folder.lower()
-
-        if label_clean in folder_lower:
+        if label_clean in folder.lower():
             folder_path = os.path.join(base_root, folder)
 
-            for file in os.listdir(folder_path):
-                if file.endswith(".mp4"):
-                    videos.append(
-                        url_for('static', filename=f'videos/{folder}/{file}')
-                    )
+            all_videos = [
+                f for f in os.listdir(folder_path)
+                if f.endswith(".mp4")
+            ]
 
-    print("VIDEOS FOUND:", videos)
+            if all_videos:
+                chosen = random.choice(all_videos)
+
+                videos.append(
+                    url_for('static', filename=f'videos/{folder}/{chosen}')
+                )
+
+    print("ONE VIDEO:", videos)
     return videos
 
 # ═══════════════════════════════════════════════════════════════════
