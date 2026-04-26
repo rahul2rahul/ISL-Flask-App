@@ -1,5 +1,6 @@
 flask
-tensorflow-cpu==2.16.2
+tensorflow-cpu==2.18.0
+keras==3.8.0
 opencv-python-headless
 huggingface_hub
 numpy==1.26.4
